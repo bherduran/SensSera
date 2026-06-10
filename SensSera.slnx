@@ -1,0 +1,14 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Folder Name="/src/">
+    <Project Path="src/SensSera.Api/SensSera.Api.csproj" />
+    <Project Path="src/SensSera.Application/SensSera.Application.csproj" />
+    <Project Path="src/SensSera.Domain/SensSera.Domain.csproj" />
+    <Project Path="src/SensSera.Infrastructure/SensSera.Infrastructure.csproj" />
+    <Project Path="src/SensSera.Simulator/SensSera.Simulator.csproj" />
+  </Folder>
+</Solution>
