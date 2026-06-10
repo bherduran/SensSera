@@ -1,0 +1,17 @@
+name: senssera
+services:
+  db:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: senssera
+      POSTGRES_USER: senssera
+      POSTGRES_PASSWORD: senssera_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql 
+
+volumes:
+  postgres_data:
+
+      

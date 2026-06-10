@@ -1,0 +1,44 @@
+using Microsoft.EntityFrameworkCore;                       
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using SensSera.Domain.Entities;
+using SensSera.Domain.Enums;
+
+namespace SensSera.Infrastructure.Persistence;
+
+public static class DataSeeder
+{
+    public static async Task SeedAsync(IServiceProvider services)
+    {
+        await using var scope = services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<AppDbContext>>();
+
+        if (await db.Organizations.AnyAsync())
+            return;
+
+        var org = new Organization
+        {
+            Name = "Demo Org",
+            Slug = "demo",
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+        };
+
+        var admin = new User
+        {
+            Email = "admin@demo.com",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin1234!"),
+            Role = Role.Admin,
+            Organization = org,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+        };
+
+        db.Organizations.Add(org);
+        db.Users.Add(admin);
+        await db.SaveChangesAsync();
+
+        logger.LogInformation("Seed data created: org={Slug}, admin={Email}", org.Slug, admin.Email);        
+    }
+}
