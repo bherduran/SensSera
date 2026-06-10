@@ -1,5 +1,7 @@
 using Scalar.AspNetCore;
 using Serilog;
+using Microsoft.EntityFrameworkCore;
+using SensSera.Infrastructure.Persistence;
 
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
@@ -14,6 +16,9 @@ builder.Host.UseSerilog((ctx, cfg) =>
 
 
 builder.Services.AddControllers();
+
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddCors(options =>
     options.AddPolicy("LocalDev", policy =>
@@ -41,5 +46,7 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 
 app.MapControllers();
+
+await DataSeeder.SeedAsync(app.Services);
 
 app.Run();
