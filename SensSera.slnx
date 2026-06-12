@@ -11,4 +11,7 @@
     <Project Path="src/SensSera.Infrastructure/SensSera.Infrastructure.csproj" />
     <Project Path="src/SensSera.Simulator/SensSera.Simulator.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/SensSera.UnitTests/SensSera.UnitTests.csproj" />
+  </Folder>
 </Solution>

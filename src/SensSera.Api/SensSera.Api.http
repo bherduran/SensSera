@@ -1,6 +1,34 @@
-@HostAddress = http://localhost:5010
+@baseUrl = http://localhost:5010
 
-GET {{HostAddress}}/weatherforecast/
-Accept: application/json
+### Health
+GET {{baseUrl}}/api/health
 
-###
+### List Greenhouses
+GET {{baseUrl}}/api/greenhouses
+
+### Create Greenhouse
+POST {{baseUrl}}/api/greenhouses
+Content-Type: application/json
+
+{
+    "name": "Test Greenhouse",
+    "location": "Anamur"
+}
+
+### Get Greenhouse by Id (replace with real id)
+GET {{baseUrl}}/api/greenhouses/00000000-0000-0000-0000-000000000000
+
+### Create Device (replace greenhouseId with real id)
+POST {{baseUrl}}/api/devices
+Content-Type: application/json
+
+{
+    "name": "Sensor-1",
+    "greenhouseId": "00000000-0000-0000-0000-000000000000"
+}
+
+### List Devices by Greenhouse (replace with real id)
+GET {{baseUrl}}/api/devices/greenhouse/00000000-0000-0000-0000-000000000000
+
+### Rotate Token (replace with real id)
+POST {{baseUrl}}/api/devices/00000000-0000-0000-0000-000000000000/rotate-token
