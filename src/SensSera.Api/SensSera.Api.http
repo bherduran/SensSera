@@ -32,3 +32,33 @@ GET {{baseUrl}}/api/devices/greenhouse/00000000-0000-0000-0000-000000000000
 
 ### Rotate Token (replace with real id)
 POST {{baseUrl}}/api/devices/00000000-0000-0000-0000-000000000000/rotate-token
+
+
+### Auth - Register (creates new org + admin user)
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+    "organizationName": "Test Org",
+    "email": "admin@testorg.com",
+    "password": "TestPass123!"
+}
+
+### Auth - Login
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+    "email": "admin@testorg.com",
+    "password": "TestPass123!"
+}
+
+### Auth - Me (paste access token from login response)
+GET {{baseUrl}}/api/auth/me
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjZGY0NGVkYy05NjhmLTQ5YTYtODFjMS01YjE2YTkyNThmMmQiLCJvcmdfaWQiOiIzZDBjOTllNC05YWRkLTRhOTEtYjkzNi01OTc0MDQ3MDhlN2YiLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL3JvbGUiOiJBZG1pbiIsImV4cCI6MTc4MTM4OTMyOCwiaXNzIjoiU2Vuc1NlcmEiLCJhdWQiOiJTZW5zU2VyYSJ9.7h9tiec34nUa1lZZjnCqfoxPf5R8TRB3_TIAnv1ndKY
+
+### Auth - Refresh (cookie is sent automatically by REST Client)
+POST {{baseUrl}}/api/auth/refresh
+
+### Auth - Logout
+POST {{baseUrl}}/api/auth/logout
