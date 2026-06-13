@@ -23,7 +23,7 @@ public class GreenhouseServiceTests : IDisposable
         _db = new AppDbContext(options);
 
         var tenant = new FakeTenantContext(_orgId);
-        _sut = new GreenhouseService(_db, tenant);    
+        _sut = new GreenhouseService(_db, tenant, TimeProvider.System);    
     }
 
     [Fact]

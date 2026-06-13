@@ -8,7 +8,7 @@ using SensSera.Infrastructure.Persistence;
 
 namespace SensSera.Infrastructure.Services;
 
-public class DeviceService(AppDbContext db, ITenantContext tenant) : IDeviceService
+public class DeviceService(AppDbContext db, ITenantContext tenant, TimeProvider timeProvider) : IDeviceService
 {
     
     public async Task<List<DeviceResponse>> GetAllByGreenhouseAsync(Guid greenhouseId)
@@ -38,8 +38,8 @@ public class DeviceService(AppDbContext db, ITenantContext tenant) : IDeviceServ
             GreenhouseId = request.GreenhouseId,
             OrganizationId = tenant.OrganizationId,
             Status = DeviceStatus.Active,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow,
+            CreatedAt = timeProvider.GetUtcNow().UtcDateTime,
+            UpdatedAt = timeProvider.GetUtcNow().UtcDateTime,
         };
 
         db.Devices.Add(device);
@@ -64,7 +64,7 @@ public class DeviceService(AppDbContext db, ITenantContext tenant) : IDeviceServ
 
         d.Name = request.Name;
         d.GreenhouseId = request.GreenhouseId;
-        d.UpdatedAt = DateTime.UtcNow;
+        d.UpdatedAt = timeProvider.GetUtcNow().UtcDateTime;
 
         await db.SaveChangesAsync();
         return ToResponse(d);    
@@ -90,7 +90,7 @@ public class DeviceService(AppDbContext db, ITenantContext tenant) : IDeviceServ
 
         var (rawToken, tokenHash) = GenerateToken(d.Id);
         d.DeviceTokenHash = tokenHash;
-        d.UpdatedAt = DateTime.UtcNow;
+        d.UpdatedAt = timeProvider.GetUtcNow().UtcDateTime;
 
         await db.SaveChangesAsync();
         return new DeviceWithTokenResponse(d.Id, d.Name, d.GreenhouseId, rawToken);    
