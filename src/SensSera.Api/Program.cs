@@ -19,6 +19,7 @@ builder.Host.UseSerilog((ctx, cfg) =>
         .WriteTo.Console());
 
 
+builder.Services.AddSingleton(TimeProvider.System);
 
 builder.Services.AddControllers();
 builder.Services.AddValidatorsFromAssemblyContaining<GreenhouseRequestValidator>();

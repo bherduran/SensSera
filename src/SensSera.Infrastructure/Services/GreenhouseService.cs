@@ -6,7 +6,7 @@ using SensSera.Infrastructure.Persistence;
 
 namespace SensSera.Infrastructure.Services;
 
-public class GreenhouseService(AppDbContext db, ITenantContext tenant) : IGreenhouseService
+public class GreenhouseService(AppDbContext db, ITenantContext tenant, TimeProvider timeProvider) : IGreenhouseService
 {
     public async Task<List<GreenhouseResponse>> GetAllAsync()
     {
@@ -33,8 +33,8 @@ public class GreenhouseService(AppDbContext db, ITenantContext tenant) : IGreenh
             Name = request.Name,
             Location = request.Location,
             OrganizationId = tenant.OrganizationId,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow
+            CreatedAt = timeProvider.GetUtcNow().UtcDateTime,
+            UpdatedAt = timeProvider.GetUtcNow().UtcDateTime
         };
 
         db.Greenhouses.Add(g);
@@ -51,7 +51,7 @@ public class GreenhouseService(AppDbContext db, ITenantContext tenant) : IGreenh
 
         g.Name = request.Name;
         g.Location = request.Location;
-        g.UpdatedAt = DateTime.UtcNow;
+        g.UpdatedAt = timeProvider.GetUtcNow().UtcDateTime;
 
         await db.SaveChangesAsync();
         return ToResponse(g);    
