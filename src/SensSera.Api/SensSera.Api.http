@@ -24,7 +24,7 @@ Content-Type: application/json
 
 {
     "name": "Sensor-1",
-    "greenhouseId": "00000000-0000-0000-0000-000000000000"
+    "greenhouseId": "06de62c6-0251-436c-9bc6-c344696fed08"
 }
 
 ### List Devices by Greenhouse (replace with real id)
