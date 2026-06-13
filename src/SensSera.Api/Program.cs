@@ -9,7 +9,12 @@ using FluentValidation;
 using SensSera.Api.Validators;
 using SensSera.Api.Auth;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+using System.IdentityModel.Tokens.Jwt;
+
 
 // Bootstrap logger — replaced by full Serilog config after host builds
 Log.Logger = new LoggerConfiguration()
@@ -25,17 +30,45 @@ builder.Host.UseSerilog((ctx, cfg) =>
 // Inject system clock — services use TimeProvider, never DateTime.UtcNow directly
 builder.Services.AddSingleton(TimeProvider.System);
 
-// Device token auth scheme — used by /api/ingest only (not JWT)
-builder.Services.AddAuthentication(DeviceTokenAuthenticationHandler.SchemeName)
+ // Authentication: JWT bearer (web clients) + device token (ingestion only)
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {   
+        options.MapInboundClaims = false;
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = builder.Configuration["Jwt:Issuer"],
+            ValidAudience = builder.Configuration["Jwt:Audience"],
+            IssuerSigningKey = new SymmetricSecurityKey(
+                Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)), 
+        };    
+    })
     .AddScheme<AuthenticationSchemeOptions, DeviceTokenAuthenticationHandler>(
-        DeviceTokenAuthenticationHandler.SchemeName, _ => { });
+        DeviceTokenAuthenticationHandler.SchemeName, _=> {});
 
-// 100 req/min fixed window on ingest routes
+// Default policy: require JWT auth on all endpoints unless overriden
+builder.Services.AddAuthorization(options =>
+{
+    options.FallbackPolicy = options.DefaultPolicy;
+});
+
+        
+
+// Rate limiters: 100 req/min for ingest, 10 req/min for auth (brute force protection)
 builder.Services.AddRateLimiter(options =>
 {
     options.AddFixedWindowLimiter("ingest", o =>
     {
         o.PermitLimit = 100;
+        o.Window = TimeSpan.FromMinutes(1);
+    });
+    options.AddFixedWindowLimiter("auth", o=>
+    {
+        o.PermitLimit = 10;
         o.Window = TimeSpan.FromMinutes(1);
     });
 });
@@ -53,6 +86,9 @@ builder.Services.AddScoped<ITenantContext, StubTenantContext>();
 builder.Services.AddScoped<IDeviceService, DeviceService>();
 builder.Services.AddScoped<IGreenhouseService, GreenhouseService>();
 builder.Services.AddScoped<IIngestionService, IngestionService>();
+builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IPasswordHasher, BCryptPasswordHasher>();
+builder.Services.AddScoped<IJwtService, JwtService>();
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
