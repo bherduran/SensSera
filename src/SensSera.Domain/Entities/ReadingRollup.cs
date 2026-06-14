@@ -6,6 +6,7 @@ namespace SensSera.Domain.Entities;
 public class ReadingRollup : BaseEntity                    
 {                                  
     public Guid DeviceId { get; set; }
+    public Guid OrganizationId { get; set; }
     public MetricType Metric { get; set; }
     public RollupBucket Bucket { get; set; }
     public DateTime PeriodStart { get; set; }
