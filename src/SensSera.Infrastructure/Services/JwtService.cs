@@ -20,7 +20,7 @@ public class JwtService(IConfiguration config) : IJwtService
         {
             new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new Claim("org_id", user.OrganizationId.ToString()),
-            new Claim(ClaimTypes.Role, user.Role.ToString()),
+            new Claim("role", user.Role.ToString()),
            
         };
 

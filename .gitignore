@@ -503,7 +503,7 @@ Thumbs.db
 .DS_Store
 
 # Internal planning docs (not for public repo)
-canopy-design-document.md
+senssera-design-document.md
 devlog.md
 progress.md
 CLAUDE.md
@@ -512,3 +512,6 @@ CLAUDE.md
 # Local dev secrets (connection strings, JWT keys)
 appsettings.Development.json
 appsettings.Local.json
+
+# Personal learning notes (not part of the project deliverables)
+test.md

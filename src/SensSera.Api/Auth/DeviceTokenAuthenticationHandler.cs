@@ -31,6 +31,7 @@ public class DeviceTokenAuthenticationHandler(
         var secretHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(parts[1])));
 
         var device = await db.Devices
+            .IgnoreQueryFilters()
             .FirstOrDefaultAsync(d => d.Id == deviceId && d.DeviceTokenHash == secretHash);
 
         if (device is null)

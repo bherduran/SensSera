@@ -10,16 +10,18 @@ public class GreenhouseService(AppDbContext db, ITenantContext tenant, TimeProvi
 {
     public async Task<List<GreenhouseResponse>> GetAllAsync()
     {
+        var orgId = tenant.RequireOrganizationId();
         return await db.Greenhouses
-            .Where(g => g.OrganizationId == tenant.OrganizationId)
+            .Where(g => g.OrganizationId == orgId)
             .Select(g => ToResponse(g))
             .ToListAsync();
     }
 
     public async Task<GreenhouseResponse> GetByIdAsync(Guid id)
     {
+        var orgId = tenant.RequireOrganizationId();
         var g = await db.Greenhouses
-            .Where(g => g.Id == id && g.OrganizationId == tenant.OrganizationId)
+            .Where(g => g.Id == id && g.OrganizationId == orgId)
             .FirstOrDefaultAsync()
             ?? throw new KeyNotFoundException($"Greenhouse {id} not found");
 
@@ -28,11 +30,12 @@ public class GreenhouseService(AppDbContext db, ITenantContext tenant, TimeProvi
 
     public async Task<GreenhouseResponse> CreateAsync(GreenhouseRequest request)
     {
+        var orgId = tenant.RequireOrganizationId();
         var g = new Greenhouse
         {
             Name = request.Name,
             Location = request.Location,
-            OrganizationId = tenant.OrganizationId,
+            OrganizationId = orgId,
             CreatedAt = timeProvider.GetUtcNow().UtcDateTime,
             UpdatedAt = timeProvider.GetUtcNow().UtcDateTime
         };
@@ -44,8 +47,9 @@ public class GreenhouseService(AppDbContext db, ITenantContext tenant, TimeProvi
 
     public async Task<GreenhouseResponse> UpdateAsync(Guid id, GreenhouseRequest request)
     {
+        var orgId = tenant.RequireOrganizationId();
         var g = await db.Greenhouses
-            .Where(g => g.Id == id && g.OrganizationId == tenant.OrganizationId)
+            .Where(g => g.Id == id && g.OrganizationId == orgId)
             .FirstOrDefaultAsync()
             ?? throw new KeyNotFoundException($"Greenhouse {id} not found");
 
@@ -59,8 +63,9 @@ public class GreenhouseService(AppDbContext db, ITenantContext tenant, TimeProvi
 
     public async Task DeleteAsync(Guid id)
     {
+        var orgId = tenant.RequireOrganizationId();
         var g = await db.Greenhouses
-            .Where(g => g.Id == id && g.OrganizationId == tenant.OrganizationId)
+            .Where(g => g.Id == id && g.OrganizationId == orgId)
             .FirstOrDefaultAsync()
             ?? throw new KeyNotFoundException($"Greenhouse {id} not found");
 

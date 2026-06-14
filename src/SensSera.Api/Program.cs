@@ -45,6 +45,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidAudience = builder.Configuration["Jwt:Audience"],
             IssuerSigningKey = new SymmetricSecurityKey(
                 Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)), 
+            RoleClaimType = "role",
+            NameClaimType = "sub",    
         };    
     })
     .AddScheme<AuthenticationSchemeOptions, DeviceTokenAuthenticationHandler>(
@@ -82,7 +84,8 @@ builder.Services.AddControllers(options =>
 builder.Services.AddValidatorsFromAssemblyContaining<GreenhouseRequestValidator>();
 
 // Services
-builder.Services.AddScoped<ITenantContext, StubTenantContext>();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ITenantContext, TenantContext>();
 builder.Services.AddScoped<IDeviceService, DeviceService>();
 builder.Services.AddScoped<IGreenhouseService, GreenhouseService>();
 builder.Services.AddScoped<IIngestionService, IngestionService>();

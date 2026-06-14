@@ -20,9 +20,9 @@ public class GreenhouseServiceTests : IDisposable
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
 
-        _db = new AppDbContext(options);
-
+       
         var tenant = new FakeTenantContext(_orgId);
+         _db = new AppDbContext(options, tenant);
         _sut = new GreenhouseService(_db, tenant, TimeProvider.System);    
     }
 
@@ -48,7 +48,7 @@ public class GreenhouseServiceTests : IDisposable
         _db.Greenhouses.Add(new Greenhouse { OrganizationId = otherId, Name = "Other", CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow});
         await _db.SaveChangesAsync();
 
-        var id = _db.Greenhouses.First().Id;
+        var id = _db.Greenhouses.IgnoreQueryFilters().First().Id;
 
         await _sut.Invoking(s => s.GetByIdAsync(id))
             .Should().ThrowAsync<KeyNotFoundException>();
@@ -69,5 +69,5 @@ public class GreenhouseServiceTests : IDisposable
 
 file sealed class FakeTenantContext(Guid orgId) : ITenantContext
 {
-    public Guid OrganizationId => orgId;
+    public Guid? OrganizationId => orgId;
 }

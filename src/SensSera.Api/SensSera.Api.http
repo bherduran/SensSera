@@ -62,3 +62,48 @@ POST {{baseUrl}}/api/auth/refresh
 
 ### Auth - Logout
 POST {{baseUrl}}/api/auth/logout
+
+
+### Stage 6 smoke test - cross-tenant isolation
+
+@tokenA = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwMzIzNmU2MC1iYmIxLTRhMGUtODBiNC02NjU4ZmE5Mjk2YWIiLCJvcmdfaWQiOiJkMDUxODhlMy1hNTVlLTQ3ZWUtOTMwZS1kOTk0MjQ0N2FlZjMiLCJyb2xlIjoiQWRtaW4iLCJleHAiOjE3ODE0MTgyODUsImlzcyI6IlNlbnNTZXJhIiwiYXVkIjoiU2Vuc1NlcmEifQ.hrdhRBJidBfgu06ZnM1UFdaZ-vNlBY_OJ9Vr_gGQChQ
+@tokenB = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1ODgwMDkyZC1mMDgwLTRlYTktYWMwYi1jY2VmNzJkZTAzZWYiLCJvcmdfaWQiOiI3MjQzN2ZiYy1iMTEzLTQyNmYtYjk2Yy02ZDRkZGMzYzBiNDIiLCJyb2xlIjoiQWRtaW4iLCJleHAiOjE3ODE0MTgzODMsImlzcyI6IlNlbnNTZXJhIiwiYXVkIjoiU2Vuc1NlcmEifQ.03nfOsVBT9xrnzu6jUfSQ94MuF04lwJcr0ODaTNK1NU
+@ghAId = c84e3daa-a6fa-440f-b6b6-f303e0403bd9
+
+### Register Org A
+POST http://localhost:5010/api/auth/register
+Content-Type: application/json
+
+{ 
+    "organizationName": "Org A", 
+    "email": "a@aa.com",
+    "password": "password123"
+}
+
+### Create greenhouse as A - copy id into @ghAId, accesToken into @tokenA
+POST http://localhost:5010/api/greenhouses
+Authorization: Bearer {{tokenA}}
+Content-Type: application/json
+
+{
+    "name": "A's Greenhouse",
+    "location": "Anamur"
+}
+
+### Register Org B - copy accessToken into @tokenB
+POST http://localhost:5010/api/auth/register
+Content-Type: application/json
+
+{ 
+    "organizationName": "Org B", 
+    "email": "bb@b.com",
+    "password": "password123"
+}
+
+### List greenhouses as B - expect {}
+GET http://localhost:5010/api/greenhouses
+Authorization: Bearer {{tokenB}}
+
+### Get A's greenhouse as B - expect 404
+GET http://localhost:5010/api/greenhouses/{{ghAId}}
+Authorization: Bearer {{tokenB}}
