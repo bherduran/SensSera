@@ -9,7 +9,7 @@ namespace SensSera.Infrastructure.Services;
 
 public class IngestionService(AppDbContext db, TimeProvider timeProvider) : IIngestionService
 {
-    public async Task IngestAsync(Guid deviceId, Guid organizationId, IngestRequest request)
+    public async Task IngestAsync(Guid deviceId, Guid organizationId, IngestRequest request, CancellationToken cancellationToken = default)
     {
         if(!Enum.TryParse<MetricType>(request.Metric, ignoreCase: true, out var metric))
             throw new ArgumentException($"Unknown metric: {request.Metric}");
@@ -31,14 +31,14 @@ public class IngestionService(AppDbContext db, TimeProvider timeProvider) : IIng
 
         await db.Devices
             .Where(d => d.Id == deviceId)
-            .ExecuteUpdateAsync(s => s.SetProperty(d => d.LastSeenAt, timeProvider.GetUtcNow().UtcDateTime));
+            .ExecuteUpdateAsync(s => s.SetProperty(d => d.LastSeenAt, timeProvider.GetUtcNow().UtcDateTime), cancellationToken);
 
-        await db.SaveChangesAsync();        
+        await db.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task IngestBatchAsync(Guid deviceId, Guid organizationId, IngestBatchRequest request)
+    public async Task IngestBatchAsync(Guid deviceId, Guid organizationId, IngestBatchRequest request, CancellationToken cancellationToken = default)
     {
         foreach (var r in request.Readings)
-            await IngestAsync(deviceId, organizationId, r);
+            await IngestAsync(deviceId, organizationId, r, cancellationToken);
     }
 }

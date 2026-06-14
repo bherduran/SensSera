@@ -4,9 +4,9 @@ namespace SensSera.Application.Interfaces;
 
 public interface IGreenhouseService
 {
-    Task<List<GreenhouseResponse>> GetAllAsync();
-    Task<GreenhouseResponse> GetByIdAsync(Guid id);
-    Task<GreenhouseResponse> CreateAsync(GreenhouseRequest request);
-    Task<GreenhouseResponse> UpdateAsync(Guid id, GreenhouseRequest request);
-    Task DeleteAsync(Guid id);
+    Task<List<GreenhouseResponse>> GetAllAsync(CancellationToken cancellationToken = default);
+    Task<GreenhouseResponse> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<GreenhouseResponse> CreateAsync(GreenhouseRequest request, CancellationToken cancellationToken = default);
+    Task<GreenhouseResponse> UpdateAsync(Guid id, GreenhouseRequest request, CancellationToken cancellationToken = default);
+    Task DeleteAsync(Guid id, CancellationToken cancellationToken = default);
 }

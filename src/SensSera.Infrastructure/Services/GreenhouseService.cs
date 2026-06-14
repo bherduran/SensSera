@@ -8,27 +8,27 @@ namespace SensSera.Infrastructure.Services;
 
 public class GreenhouseService(AppDbContext db, ITenantContext tenant, TimeProvider timeProvider) : IGreenhouseService
 {
-    public async Task<List<GreenhouseResponse>> GetAllAsync()
+    public async Task<List<GreenhouseResponse>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         var orgId = tenant.RequireOrganizationId();
         return await db.Greenhouses
             .Where(g => g.OrganizationId == orgId)
             .Select(g => ToResponse(g))
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
     }
 
-    public async Task<GreenhouseResponse> GetByIdAsync(Guid id)
+    public async Task<GreenhouseResponse> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var orgId = tenant.RequireOrganizationId();
         var g = await db.Greenhouses
             .Where(g => g.Id == id && g.OrganizationId == orgId)
-            .FirstOrDefaultAsync()
+            .FirstOrDefaultAsync(cancellationToken)
             ?? throw new KeyNotFoundException($"Greenhouse {id} not found");
 
         return ToResponse(g);    
     }
 
-    public async Task<GreenhouseResponse> CreateAsync(GreenhouseRequest request)
+    public async Task<GreenhouseResponse> CreateAsync(GreenhouseRequest request, CancellationToken cancellationToken = default)
     {
         var orgId = tenant.RequireOrganizationId();
         var g = new Greenhouse
@@ -41,37 +41,37 @@ public class GreenhouseService(AppDbContext db, ITenantContext tenant, TimeProvi
         };
 
         db.Greenhouses.Add(g);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
         return ToResponse(g);
     }
 
-    public async Task<GreenhouseResponse> UpdateAsync(Guid id, GreenhouseRequest request)
+    public async Task<GreenhouseResponse> UpdateAsync(Guid id, GreenhouseRequest request, CancellationToken cancellationToken = default)
     {
         var orgId = tenant.RequireOrganizationId();
         var g = await db.Greenhouses
             .Where(g => g.Id == id && g.OrganizationId == orgId)
-            .FirstOrDefaultAsync()
+            .FirstOrDefaultAsync(cancellationToken)
             ?? throw new KeyNotFoundException($"Greenhouse {id} not found");
 
         g.Name = request.Name;
         g.Location = request.Location;
         g.UpdatedAt = timeProvider.GetUtcNow().UtcDateTime;
 
-        await db.SaveChangesAsync();
-        return ToResponse(g);    
+        await db.SaveChangesAsync(cancellationToken);
+        return ToResponse(g);
     }
 
-    public async Task DeleteAsync(Guid id)
+    public async Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var orgId = tenant.RequireOrganizationId();
         var g = await db.Greenhouses
             .Where(g => g.Id == id && g.OrganizationId == orgId)
-            .FirstOrDefaultAsync()
+            .FirstOrDefaultAsync(cancellationToken)
             ?? throw new KeyNotFoundException($"Greenhouse {id} not found");
 
 
         db.Greenhouses.Remove(g);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
         
     }
 
