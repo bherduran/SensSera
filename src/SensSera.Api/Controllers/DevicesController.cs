@@ -7,6 +7,7 @@ namespace SensSera.Api.Controllers;
 
 [ApiController]
 [Route("api/devices")]
+[Authorize]
 public class DevicesController(IDeviceService service) : ControllerBase
 {
     [HttpGet("greenhouse/{greenhouseId:guid}")]
