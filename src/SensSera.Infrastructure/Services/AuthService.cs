@@ -17,7 +17,7 @@ public class AuthService(
 {
     public async Task<(LoginResponse Response, string RefreshToken)> RegisterAsync(RegisterRequest request)
     {
-        if (await db.Users.AnyAsync(u => u.Email == request.Email))
+        if (await db.Users.IgnoreQueryFilters().AnyAsync(u => u.Email == request.Email))
             throw new ArgumentException("Email already in use");
 
         var org = new Organization
@@ -50,7 +50,7 @@ public class AuthService(
 
     public async Task<(LoginResponse Response, string RefreshToken)> LoginAsync(LoginRequest request)
     {
-        var user = await db.Users.FirstOrDefaultAsync(u => u.Email == request.Email)
+        var user = await db.Users.IgnoreQueryFilters().FirstOrDefaultAsync(u => u.Email == request.Email)
             ?? throw new UnauthorizedAccessException("Invalid credentials");
 
         if (!passwordHasher.Verify(request.Password, user.PasswordHash))
@@ -64,6 +64,7 @@ public class AuthService(
     {
         var hash = HashToken(refreshToken);
         var stored = await db.RefreshTokens
+            .IgnoreQueryFilters()
             .Include(r => r.User)
             .FirstOrDefaultAsync(r => r.TokenHash == hash && r.RevokedAt == null)
             ?? throw new UnauthorizedAccessException("Invalid or expired refresh token");

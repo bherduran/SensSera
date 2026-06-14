@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using SensSera.Application.DTOs;
 using SensSera.Application.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 
 namespace SensSera.Api.Controllers;
 
@@ -18,6 +19,7 @@ public class GreenhousesController(IGreenhouseService service) : ControllerBase
         Ok(await service.GetByIdAsync(id));
 
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Create(GreenhouseRequest request)
     {
         var result = await service.CreateAsync(request);
@@ -25,10 +27,12 @@ public class GreenhousesController(IGreenhouseService service) : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Update(Guid id, GreenhouseRequest request) => 
     Ok(await service.UpdateAsync(id, request));
 
     [HttpDelete("{id:guid}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Delete(Guid id)
     {
         await service.DeleteAsync(id);

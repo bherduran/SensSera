@@ -22,7 +22,7 @@ public class AuthServiceTests : IDisposable
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
 
-        _db = new AppDbContext(options);
+        _db = new AppDbContext(options, new FakeNullTenantContext());
         _sut = new AuthService(_db, new FakePasswordHasher(), new FakeJwtService(), TimeProvider.System);
     }
 
@@ -33,10 +33,10 @@ public class AuthServiceTests : IDisposable
             new RegisterRequest("My Org", "admin@my.com", "password123"));
 
         _db.Organizations.Should().HaveCount(1);
-        _db.Users.Should().HaveCount(1);
+        _db.Users.IgnoreQueryFilters().Should().HaveCount(1);
         _db.RefreshTokens.Should().HaveCount(1);
 
-        var user = await _db.Users.SingleAsync();
+        var user = await _db.Users.IgnoreQueryFilters().SingleAsync();
         user.Role.Should().Be(Role.Admin);
         user.Email.Should().Be("admin@my.com");
         refreshToken.Should().NotBeNullOrEmpty();
@@ -97,4 +97,9 @@ file sealed class FakeJwtService : IJwtService
 {
     public string GenerateAccessToken(User user) => $"access-{user.Id}";
     public string GenerateRefreshToken() => Guid.NewGuid().ToString("N");
+}
+
+file sealed class FakeNullTenantContext : ITenantContext
+{
+    public Guid? OrganizationId => null;
 }

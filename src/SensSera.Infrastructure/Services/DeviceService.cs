@@ -13,16 +13,18 @@ public class DeviceService(AppDbContext db, ITenantContext tenant, TimeProvider 
     
     public async Task<List<DeviceResponse>> GetAllByGreenhouseAsync(Guid greenhouseId)
     {
+        var orgId = tenant.RequireOrganizationId();
         return await db.Devices
-            .Where(d => d.GreenhouseId == greenhouseId && d.OrganizationId == tenant.OrganizationId)
+            .Where(d => d.GreenhouseId == greenhouseId && d.OrganizationId == orgId)
             .Select(d => ToResponse(d))
             .ToListAsync();
     }
 
     public async Task<DeviceResponse> GetByIdAsync(Guid id)
     {
+        var orgId = tenant.RequireOrganizationId();
         var d = await db.Devices
-            .Where(d => d.Id == id && d.OrganizationId == tenant.OrganizationId)
+            .Where(d => d.Id == id && d.OrganizationId == orgId)
             .FirstOrDefaultAsync()
             ?? throw new KeyNotFoundException($"Device {id} not found");
 
@@ -32,11 +34,12 @@ public class DeviceService(AppDbContext db, ITenantContext tenant, TimeProvider 
     {
         await VerifyGreenhouseOwnershipAsync(request.GreenhouseId);
 
+        var orgId = tenant.RequireOrganizationId();
         var device = new Device
         {
             Name = request.Name,
             GreenhouseId = request.GreenhouseId,
-            OrganizationId = tenant.OrganizationId,
+            OrganizationId = orgId,
             Status = DeviceStatus.Active,
             CreatedAt = timeProvider.GetUtcNow().UtcDateTime,
             UpdatedAt = timeProvider.GetUtcNow().UtcDateTime,
@@ -55,8 +58,9 @@ public class DeviceService(AppDbContext db, ITenantContext tenant, TimeProvider 
 
     public async Task<DeviceResponse> UpdateAsync(Guid id, DeviceRequest request)
     {
+        var orgId = tenant.RequireOrganizationId();
         var d = await db.Devices
-            .Where(d => d.Id == id && d.OrganizationId == tenant.OrganizationId)
+            .Where(d => d.Id == id && d.OrganizationId == orgId)
             .FirstOrDefaultAsync()
             ?? throw new KeyNotFoundException($"Device {id} not found");
 
@@ -72,8 +76,9 @@ public class DeviceService(AppDbContext db, ITenantContext tenant, TimeProvider 
 
     public async Task DeleteAsync(Guid id)
     {
+        var orgId = tenant.RequireOrganizationId();
         var d = await db.Devices
-            .Where(d => d.Id == id && d.OrganizationId == tenant.OrganizationId)
+            .Where(d => d.Id == id && d.OrganizationId == orgId)
             .FirstOrDefaultAsync()
             ?? throw new KeyNotFoundException($"Device {id} not found");
 
@@ -83,8 +88,9 @@ public class DeviceService(AppDbContext db, ITenantContext tenant, TimeProvider 
 
     public async Task<DeviceWithTokenResponse> RotateTokenAsync(Guid id)
     {
+        var orgId = tenant.RequireOrganizationId();
         var d = await db.Devices
-            .Where(d => d.Id == id && d.OrganizationId == tenant.OrganizationId)
+            .Where(d => d.Id == id && d.OrganizationId == orgId)
             .FirstOrDefaultAsync()
             ?? throw new KeyNotFoundException($"Device {id} not found");
 
@@ -98,8 +104,9 @@ public class DeviceService(AppDbContext db, ITenantContext tenant, TimeProvider 
 
     private async Task VerifyGreenhouseOwnershipAsync(Guid greenhouseId)
     {
+        var orgId = tenant.RequireOrganizationId();
         var exists = await db.Greenhouses
-            .AnyAsync(g => g.Id == greenhouseId && g.OrganizationId == tenant.OrganizationId);
+            .AnyAsync(g => g.Id == greenhouseId && g.OrganizationId == orgId);
 
         if (!exists)
             throw new KeyNotFoundException($"Greenhouse {greenhouseId} not found");    
