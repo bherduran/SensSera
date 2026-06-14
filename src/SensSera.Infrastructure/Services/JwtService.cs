@@ -2,18 +2,20 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using SensSera.Application.Interfaces;
+using SensSera.Application.Options;
 using SensSera.Domain.Entities;
 
 namespace SensSera.Infrastructure.Services;
 
-public sealed class JwtService(IConfiguration config) : IJwtService
+public sealed class JwtService(IOptions<JwtOptions> options) : IJwtService
 {
+    private readonly JwtOptions _opts = options.Value;
     public string GenerateAccessToken(User user)
     {
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(config["Jwt:Key"]!));
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_opts.Key));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
         var claims = new []
@@ -25,8 +27,8 @@ public sealed class JwtService(IConfiguration config) : IJwtService
         };
 
         var token = new JwtSecurityToken(   
-            issuer: config["Jwt:Issuer"],
-            audience: config["Jwt:Audience"],
+            issuer: _opts.Issuer,
+            audience: _opts.Audience,
             claims: claims, 
             expires: DateTime.UtcNow.AddMinutes(15),
         signingCredentials: creds);
