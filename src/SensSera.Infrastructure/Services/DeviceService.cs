@@ -8,7 +8,7 @@ using SensSera.Infrastructure.Persistence;
 
 namespace SensSera.Infrastructure.Services;
 
-public class DeviceService(AppDbContext db, ITenantContext tenant, TimeProvider timeProvider) : IDeviceService
+public sealed class DeviceService(AppDbContext db, ITenantContext tenant, TimeProvider timeProvider) : IDeviceService
 {
     
     public async Task<List<DeviceResponse>> GetAllByGreenhouseAsync(Guid greenhouseId, CancellationToken cancellationToken = default)

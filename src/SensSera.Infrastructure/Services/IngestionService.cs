@@ -7,7 +7,7 @@ using SensSera.Infrastructure.Persistence;
 
 namespace SensSera.Infrastructure.Services;
 
-public class IngestionService(AppDbContext db, TimeProvider timeProvider) : IIngestionService
+public sealed class IngestionService(AppDbContext db, TimeProvider timeProvider) : IIngestionService
 {
     public async Task IngestAsync(Guid deviceId, Guid organizationId, IngestRequest request, CancellationToken cancellationToken = default)
     {

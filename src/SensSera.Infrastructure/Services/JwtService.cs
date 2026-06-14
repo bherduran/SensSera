@@ -9,7 +9,7 @@ using SensSera.Domain.Entities;
 
 namespace SensSera.Infrastructure.Services;
 
-public class JwtService(IConfiguration config) : IJwtService
+public sealed class JwtService(IConfiguration config) : IJwtService
 {
     public string GenerateAccessToken(User user)
     {

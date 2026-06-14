@@ -9,7 +9,7 @@ namespace SensSera.Api.Controllers;
 [ApiController]
 [Route("api/auth")]
 [EnableRateLimiting("auth")]
-public class AuthController(IAuthService authService) : ControllerBase
+public sealed class AuthController(IAuthService authService) : ControllerBase
 {   
     [AllowAnonymous]
     [HttpPost("register")]

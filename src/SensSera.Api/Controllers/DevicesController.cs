@@ -8,7 +8,7 @@ namespace SensSera.Api.Controllers;
 [ApiController]
 [Route("api/devices")]
 [Authorize]
-public class DevicesController(IDeviceService service) : ControllerBase
+public sealed class DevicesController(IDeviceService service) : ControllerBase
 {
     [HttpGet("greenhouse/{greenhouseId:guid}")]
     public async Task<IActionResult> GetByGreenhouse(Guid greenhouseId, CancellationToken cancellationToken) =>

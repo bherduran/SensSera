@@ -3,7 +3,7 @@ using SensSera.Application.DTOs;
 
 namespace SensSera.Api.Validators;
 
-public class IngestRequestValidator : AbstractValidator<IngestRequest>
+public sealed class IngestRequestValidator : AbstractValidator<IngestRequest>
 {
     private static readonly Dictionary<string, (double Min, double Max)> Ranges = new(StringComparer.OrdinalIgnoreCase)
     {

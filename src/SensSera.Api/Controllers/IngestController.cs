@@ -13,7 +13,7 @@ namespace SensSera.Api.Controllers;
 [Authorize(AuthenticationSchemes = DeviceTokenAuthenticationHandler.SchemeName)]
 [EnableRateLimiting("ingest")]
 
-public class IngestController(IIngestionService service) : ControllerBase
+public sealed class IngestController(IIngestionService service) : ControllerBase
 {
     [HttpPost]
     public async Task<IActionResult> Ingest(IngestRequest request, CancellationToken cancellationToken)

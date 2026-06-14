@@ -8,7 +8,7 @@ namespace SensSera.Api.Controllers;
 [ApiController]
 [Route("api/greenhouses")]
 [Authorize]
-public class GreenhousesController(IGreenhouseService service) : ControllerBase
+public sealed class GreenhousesController(IGreenhouseService service) : ControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> GetAll(CancellationToken cancellationToken) =>

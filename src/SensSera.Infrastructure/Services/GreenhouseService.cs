@@ -6,7 +6,7 @@ using SensSera.Infrastructure.Persistence;
 
 namespace SensSera.Infrastructure.Services;
 
-public class GreenhouseService(AppDbContext db, ITenantContext tenant, TimeProvider timeProvider) : IGreenhouseService
+public sealed class GreenhouseService(AppDbContext db, ITenantContext tenant, TimeProvider timeProvider) : IGreenhouseService
 {
     public async Task<List<GreenhouseResponse>> GetAllAsync(CancellationToken cancellationToken = default)
     {

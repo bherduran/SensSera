@@ -9,7 +9,7 @@ using SensSera.Infrastructure.Persistence;
 
 namespace SensSera.Infrastructure.Services;
 
-public class AuthService(
+public sealed class AuthService(
     AppDbContext db,
     IPasswordHasher passwordHasher,
     IJwtService jwtService,
