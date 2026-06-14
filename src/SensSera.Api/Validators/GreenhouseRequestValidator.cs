@@ -3,7 +3,7 @@ using SensSera.Application.DTOs;
 
 namespace SensSera.Api.Validators;
 
-public class GreenhouseRequestValidator : AbstractValidator<GreenhouseRequest>
+public sealed class GreenhouseRequestValidator : AbstractValidator<GreenhouseRequest>
 {
     public GreenhouseRequestValidator()
     {

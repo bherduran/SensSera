@@ -9,56 +9,56 @@ namespace SensSera.Api.Controllers;
 [ApiController]
 [Route("api/auth")]
 [EnableRateLimiting("auth")]
-public class AuthController(IAuthService authService) : ControllerBase
+public sealed class AuthController(IAuthService authService) : ControllerBase
 {   
     [AllowAnonymous]
     [HttpPost("register")]
-    public async Task<IActionResult> Register([FromBody] RegisterRequest request)
+    public async Task<IActionResult> Register([FromBody] RegisterRequest request, CancellationToken cancellationToken)
     {
-        var (response, refreshToken) = await authService.RegisterAsync(request);
+        var (response, refreshToken) = await authService.RegisterAsync(request, cancellationToken);
         SetRefreshTokenCookie(refreshToken);
         return Ok(response);
     }
 
     [AllowAnonymous]
     [HttpPost("login")]
-    public async Task<IActionResult> Login([FromBody] LoginRequest request)
+    public async Task<IActionResult> Login([FromBody] LoginRequest request, CancellationToken cancellationToken)
     {
-        var (response, refreshToken) = await authService.LoginAsync(request);
+        var (response, refreshToken) = await authService.LoginAsync(request, cancellationToken);
         SetRefreshTokenCookie(refreshToken);
         return Ok(response);
     }
 
     [AllowAnonymous]
     [HttpPost("refresh")]
-    public async Task<IActionResult> Refresh()
+    public async Task<IActionResult> Refresh(CancellationToken cancellationToken)
     {
         var token = Request.Cookies["refreshToken"]
             ?? throw new UnauthorizedAccessException("Refresh token missing");
-        var response = await authService.RefreshAsync(token);
-        return Ok(response);    
+        var response = await authService.RefreshAsync(token, cancellationToken);
+        return Ok(response);
     }
 
     [AllowAnonymous]
     [HttpPost("logout")]
-    public async Task<IActionResult> Logout()
+    public async Task<IActionResult> Logout(CancellationToken cancellationToken)
     {
         var token = Request.Cookies["refreshToken"];
         if (token is not null)
-            await authService.LogoutAsync(token);
+            await authService.LogoutAsync(token, cancellationToken);
         Response.Cookies.Delete("refreshToken");
-        return NoContent();    
+        return NoContent();
     }
 
     [Authorize]
     [HttpGet("me")]
-    public async Task<IActionResult> Me()
+    public async Task<IActionResult> Me(CancellationToken cancellationToken)
     {
         var userIdStr = User.FindFirst("sub")?.Value;
         if (!Guid.TryParse(userIdStr, out var userId))
             return Unauthorized();
-        var response = await authService.MeAsync(userId);
-        return Ok(response);        
+        var response = await authService.MeAsync(userId, cancellationToken);
+        return Ok(response);
     }
 
     private void SetRefreshTokenCookie(string token)

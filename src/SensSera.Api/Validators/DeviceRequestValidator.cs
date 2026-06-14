@@ -3,7 +3,7 @@ using SensSera.Application.DTOs;
 
 namespace SensSera.Api.Validators;
 
-public class DeviceRequestValidator : AbstractValidator<DeviceRequest>
+public sealed class DeviceRequestValidator : AbstractValidator<DeviceRequest>
 {
     public DeviceRequestValidator()
     {

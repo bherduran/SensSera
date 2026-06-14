@@ -7,14 +7,14 @@ using SensSera.Infrastructure.Persistence;
 
 namespace SensSera.Infrastructure.Services;
 
-public class IngestionService(AppDbContext db, TimeProvider timeProvider) : IIngestionService
+public sealed class IngestionService(AppDbContext db, TimeProvider timeProvider) : IIngestionService
 {
-    public async Task IngestAsync(Guid deviceId, Guid organizationId, IngestRequest request)
+    public async Task IngestAsync(Guid deviceId, Guid organizationId, IngestRequest request, CancellationToken cancellationToken = default)
     {
         if(!Enum.TryParse<MetricType>(request.Metric, ignoreCase: true, out var metric))
             throw new ArgumentException($"Unknown metric: {request.Metric}");
 
-
+        var now = timeProvider.GetUtcNow().UtcDateTime;
         var reading = new SensorReading
         {
             DeviceId = deviceId,
@@ -22,22 +22,23 @@ public class IngestionService(AppDbContext db, TimeProvider timeProvider) : IIng
             Metric = metric,
             Value = request.Value,
             RecordedAt = request.RecordedAt,
-            CreatedAt = timeProvider.GetUtcNow().UtcDateTime,
-            UpdatedAt = timeProvider.GetUtcNow().UtcDateTime,
+            IngestedAt = now,
+            CreatedAt = now,
+            UpdatedAt = now,
         };
 
         db.SensorReadings.Add(reading);
 
         await db.Devices
             .Where(d => d.Id == deviceId)
-            .ExecuteUpdateAsync(s => s.SetProperty(d => d.LastSeenAt, timeProvider.GetUtcNow().UtcDateTime));
+            .ExecuteUpdateAsync(s => s.SetProperty(d => d.LastSeenAt, timeProvider.GetUtcNow().UtcDateTime), cancellationToken);
 
-        await db.SaveChangesAsync();        
+        await db.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task IngestBatchAsync(Guid deviceId, Guid organizationId, IngestBatchRequest request)
+    public async Task IngestBatchAsync(Guid deviceId, Guid organizationId, IngestBatchRequest request, CancellationToken cancellationToken = default)
     {
         foreach (var r in request.Readings)
-            await IngestAsync(deviceId, organizationId, r);
+            await IngestAsync(deviceId, organizationId, r, cancellationToken);
     }
 }

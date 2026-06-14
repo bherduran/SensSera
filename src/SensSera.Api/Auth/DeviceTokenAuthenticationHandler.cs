@@ -9,7 +9,7 @@ using SensSera.Infrastructure.Persistence;
 
 namespace SensSera.Api.Auth;
 
-public class DeviceTokenAuthenticationHandler(
+public sealed class DeviceTokenAuthenticationHandler(
     IOptionsMonitor<AuthenticationSchemeOptions> options,
     ILoggerFactory logger,
     UrlEncoder encoder,

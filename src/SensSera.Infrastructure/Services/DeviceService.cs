@@ -8,31 +8,33 @@ using SensSera.Infrastructure.Persistence;
 
 namespace SensSera.Infrastructure.Services;
 
-public class DeviceService(AppDbContext db, ITenantContext tenant, TimeProvider timeProvider) : IDeviceService
+public sealed class DeviceService(AppDbContext db, ITenantContext tenant, TimeProvider timeProvider) : IDeviceService
 {
     
-    public async Task<List<DeviceResponse>> GetAllByGreenhouseAsync(Guid greenhouseId)
+    public async Task<List<DeviceResponse>> GetAllByGreenhouseAsync(Guid greenhouseId, CancellationToken cancellationToken = default)
     {
         var orgId = tenant.RequireOrganizationId();
         return await db.Devices
+            .AsNoTracking()
             .Where(d => d.GreenhouseId == greenhouseId && d.OrganizationId == orgId)
             .Select(d => ToResponse(d))
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
     }
 
-    public async Task<DeviceResponse> GetByIdAsync(Guid id)
+    public async Task<DeviceResponse> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var orgId = tenant.RequireOrganizationId();
         var d = await db.Devices
+            .AsNoTracking()
             .Where(d => d.Id == id && d.OrganizationId == orgId)
-            .FirstOrDefaultAsync()
+            .FirstOrDefaultAsync(cancellationToken)
             ?? throw new KeyNotFoundException($"Device {id} not found");
 
-        return ToResponse(d);    
+        return ToResponse(d);
     }
-    public async Task<DeviceWithTokenResponse> CreateAsync(DeviceRequest request)
+    public async Task<DeviceWithTokenResponse> CreateAsync(DeviceRequest request, CancellationToken cancellationToken = default)
     {
-        await VerifyGreenhouseOwnershipAsync(request.GreenhouseId);
+        await VerifyGreenhouseOwnershipAsync(request.GreenhouseId, cancellationToken);
 
         var orgId = tenant.RequireOrganizationId();
         var device = new Device
@@ -46,70 +48,70 @@ public class DeviceService(AppDbContext db, ITenantContext tenant, TimeProvider 
         };
 
         db.Devices.Add(device);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
 
         var (rawToken, tokenHash) = GenerateToken(device.Id);
         device.DeviceTokenHash = tokenHash;
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
 
         return new DeviceWithTokenResponse(device.Id, device.Name, device.GreenhouseId, rawToken);
     }
 
 
-    public async Task<DeviceResponse> UpdateAsync(Guid id, DeviceRequest request)
+    public async Task<DeviceResponse> UpdateAsync(Guid id, DeviceRequest request, CancellationToken cancellationToken = default)
     {
         var orgId = tenant.RequireOrganizationId();
         var d = await db.Devices
             .Where(d => d.Id == id && d.OrganizationId == orgId)
-            .FirstOrDefaultAsync()
+            .FirstOrDefaultAsync(cancellationToken)
             ?? throw new KeyNotFoundException($"Device {id} not found");
 
-        await VerifyGreenhouseOwnershipAsync(request.GreenhouseId);
+        await VerifyGreenhouseOwnershipAsync(request.GreenhouseId, cancellationToken);
 
         d.Name = request.Name;
         d.GreenhouseId = request.GreenhouseId;
         d.UpdatedAt = timeProvider.GetUtcNow().UtcDateTime;
 
-        await db.SaveChangesAsync();
-        return ToResponse(d);    
+        await db.SaveChangesAsync(cancellationToken);
+        return ToResponse(d);
     }
 
-    public async Task DeleteAsync(Guid id)
+    public async Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var orgId = tenant.RequireOrganizationId();
         var d = await db.Devices
             .Where(d => d.Id == id && d.OrganizationId == orgId)
-            .FirstOrDefaultAsync()
+            .FirstOrDefaultAsync(cancellationToken)
             ?? throw new KeyNotFoundException($"Device {id} not found");
 
         db.Devices.Remove(d);
-        await db.SaveChangesAsync();    
+        await db.SaveChangesAsync(cancellationToken);
     }
 
-    public async Task<DeviceWithTokenResponse> RotateTokenAsync(Guid id)
+    public async Task<DeviceWithTokenResponse> RotateTokenAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var orgId = tenant.RequireOrganizationId();
         var d = await db.Devices
             .Where(d => d.Id == id && d.OrganizationId == orgId)
-            .FirstOrDefaultAsync()
+            .FirstOrDefaultAsync(cancellationToken)
             ?? throw new KeyNotFoundException($"Device {id} not found");
 
         var (rawToken, tokenHash) = GenerateToken(d.Id);
         d.DeviceTokenHash = tokenHash;
         d.UpdatedAt = timeProvider.GetUtcNow().UtcDateTime;
 
-        await db.SaveChangesAsync();
-        return new DeviceWithTokenResponse(d.Id, d.Name, d.GreenhouseId, rawToken);    
+        await db.SaveChangesAsync(cancellationToken);
+        return new DeviceWithTokenResponse(d.Id, d.Name, d.GreenhouseId, rawToken);
     }
 
-    private async Task VerifyGreenhouseOwnershipAsync(Guid greenhouseId)
+    private async Task VerifyGreenhouseOwnershipAsync(Guid greenhouseId, CancellationToken cancellationToken)
     {
         var orgId = tenant.RequireOrganizationId();
         var exists = await db.Greenhouses
-            .AnyAsync(g => g.Id == greenhouseId && g.OrganizationId == orgId);
+            .AnyAsync(g => g.Id == greenhouseId && g.OrganizationId == orgId, cancellationToken);
 
         if (!exists)
-            throw new KeyNotFoundException($"Greenhouse {greenhouseId} not found");    
+            throw new KeyNotFoundException($"Greenhouse {greenhouseId} not found");
     }
     
     private static (string rawToken, string tokenHash) GenerateToken(Guid deviceId)

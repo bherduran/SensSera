@@ -4,7 +4,7 @@ using SensSera.Application.DTOs;
 
 namespace SensSera.Api.Validators;
 
-public class RegisterRequestValidator : AbstractValidator<RegisterRequest>
+public sealed class RegisterRequestValidator : AbstractValidator<RegisterRequest>
 {
     public RegisterRequestValidator()
     {
@@ -14,7 +14,7 @@ public class RegisterRequestValidator : AbstractValidator<RegisterRequest>
     }
 }
 
-public class LoginRequestValidator : AbstractValidator<LoginRequest>
+public sealed class LoginRequestValidator : AbstractValidator<LoginRequest>
 {
     public LoginRequestValidator()
     {

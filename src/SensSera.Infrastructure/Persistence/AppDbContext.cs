@@ -34,6 +34,7 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Alert>().HasQueryFilter(a => _tenant!.OrganizationId != null && a.OrganizationId == _tenant.OrganizationId);
         modelBuilder.Entity<SensorReading>().HasQueryFilter(s => _tenant!.OrganizationId != null && s.OrganizationId == _tenant.OrganizationId);
         modelBuilder.Entity<User>().HasQueryFilter(u => _tenant!.OrganizationId != null && u.OrganizationId == _tenant.OrganizationId);
+        modelBuilder.Entity<ReadingRollup>().HasQueryFilter(u => _tenant!.OrganizationId != null && u.OrganizationId == _tenant.OrganizationId);
 
     }
     

@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using Microsoft.Extensions.Configuration;
 
 var config = new ConfigurationBuilder()
+    .SetBasePath(AppContext.BaseDirectory)
     .AddJsonFile("appsettings.json")
     .Build();
 

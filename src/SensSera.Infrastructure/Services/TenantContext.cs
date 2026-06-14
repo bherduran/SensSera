@@ -4,7 +4,7 @@ using SensSera.Application.Interfaces;
 
 namespace SensSera.Infrastructure.Services;
 
-public class TenantContext(IHttpContextAccessor accessor) : ITenantContext
+public sealed class TenantContext(IHttpContextAccessor accessor) : ITenantContext
 {
     public Guid? OrganizationId
     {

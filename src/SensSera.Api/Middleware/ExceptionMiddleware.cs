@@ -3,7 +3,7 @@ using System.Text.Json;
 
 namespace SensSera.Api.Middleware;
 
-public class ExceptionMiddleware(RequestDelegate next, ILogger<ExceptionMiddleware> logger)
+public sealed class ExceptionMiddleware(RequestDelegate next, ILogger<ExceptionMiddleware> logger)
 {
     public async Task InvokeAsync(HttpContext context)
     {
@@ -20,19 +20,19 @@ public class ExceptionMiddleware(RequestDelegate next, ILogger<ExceptionMiddlewa
 
     private static async Task WriteProblemAsync(HttpContext context, Exception ex)
     {
-        var (status, title) = ex switch
+        var (status,title, detail) = ex switch
         {
-            KeyNotFoundException => (StatusCodes.Status404NotFound, "Not Found"),
-            UnauthorizedAccessException => (StatusCodes.Status403Forbidden, "Forbidden"),
-            ArgumentException => (StatusCodes.Status400BadRequest, "Bad Request"),
-            _=> (StatusCodes.Status500InternalServerError, "An unexpected error occured")
+            KeyNotFoundException => (StatusCodes.Status404NotFound, "Not Found", ex.Message),
+            UnauthorizedAccessException => (StatusCodes.Status403Forbidden, "Forbidden", ex.Message),
+            ArgumentException => (StatusCodes.Status400BadRequest, "Bad Request", ex.Message),
+            _=> (StatusCodes.Status500InternalServerError,"An unexpected error occured" ,"An unexpected error occured. Please try again later.")
         };
 
         var problem = new ProblemDetails
         {
             Status = status,
             Title = title,
-            Detail = ex.Message,
+            Detail = detail,
             Instance = context.Request.Path
         };
 
