@@ -79,6 +79,13 @@ builder.Services.AddRateLimiter(options =>
 builder.Services.AddControllers(options =>
 {
     options.Filters.Add(new Microsoft.AspNetCore.Mvc.RequestSizeLimitAttribute(1024 * 1024));
+})
+.AddJsonOptions(options =>
+{
+    options.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+    options.JsonSerializerOptions.Converters.Add(
+        new System.Text.Json.Serialization.JsonStringEnumConverter(
+            System.Text.Json.JsonNamingPolicy.CamelCase));
 });
 
 builder.Services.AddValidatorsFromAssemblyContaining<GreenhouseRequestValidator>();
