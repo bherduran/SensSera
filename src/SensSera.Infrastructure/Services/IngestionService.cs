@@ -14,7 +14,7 @@ public class IngestionService(AppDbContext db, TimeProvider timeProvider) : IIng
         if(!Enum.TryParse<MetricType>(request.Metric, ignoreCase: true, out var metric))
             throw new ArgumentException($"Unknown metric: {request.Metric}");
 
-
+        var now = timeProvider.GetUtcNow().UtcDateTime;
         var reading = new SensorReading
         {
             DeviceId = deviceId,
@@ -22,8 +22,9 @@ public class IngestionService(AppDbContext db, TimeProvider timeProvider) : IIng
             Metric = metric,
             Value = request.Value,
             RecordedAt = request.RecordedAt,
-            CreatedAt = timeProvider.GetUtcNow().UtcDateTime,
-            UpdatedAt = timeProvider.GetUtcNow().UtcDateTime,
+            IngestedAt = now,
+            CreatedAt = now,
+            UpdatedAt = now,
         };
 
         db.SensorReadings.Add(reading);
