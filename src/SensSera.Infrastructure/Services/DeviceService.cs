@@ -15,6 +15,7 @@ public sealed class DeviceService(AppDbContext db, ITenantContext tenant, TimePr
     {
         var orgId = tenant.RequireOrganizationId();
         return await db.Devices
+            .AsNoTracking()
             .Where(d => d.GreenhouseId == greenhouseId && d.OrganizationId == orgId)
             .Select(d => ToResponse(d))
             .ToListAsync(cancellationToken);
@@ -24,6 +25,7 @@ public sealed class DeviceService(AppDbContext db, ITenantContext tenant, TimePr
     {
         var orgId = tenant.RequireOrganizationId();
         var d = await db.Devices
+            .AsNoTracking()
             .Where(d => d.Id == id && d.OrganizationId == orgId)
             .FirstOrDefaultAsync(cancellationToken)
             ?? throw new KeyNotFoundException($"Device {id} not found");

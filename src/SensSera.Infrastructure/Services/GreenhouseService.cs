@@ -12,6 +12,7 @@ public sealed class GreenhouseService(AppDbContext db, ITenantContext tenant, Ti
     {
         var orgId = tenant.RequireOrganizationId();
         return await db.Greenhouses
+            .AsNoTracking()
             .Where(g => g.OrganizationId == orgId)
             .Select(g => ToResponse(g))
             .ToListAsync(cancellationToken);
@@ -21,6 +22,7 @@ public sealed class GreenhouseService(AppDbContext db, ITenantContext tenant, Ti
     {
         var orgId = tenant.RequireOrganizationId();
         var g = await db.Greenhouses
+            .AsNoTracking()
             .Where(g => g.Id == id && g.OrganizationId == orgId)
             .FirstOrDefaultAsync(cancellationToken)
             ?? throw new KeyNotFoundException($"Greenhouse {id} not found");

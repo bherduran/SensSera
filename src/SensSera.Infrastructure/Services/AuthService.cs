@@ -96,7 +96,9 @@ public sealed class AuthService(
 
     public async Task<MeResponse> MeAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        var user = await db.Users.FindAsync([userId], cancellationToken)
+        var user = await db.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken)
             ?? throw new KeyNotFoundException("User not found");
         return new MeResponse(user.Id, user.Email, user.Role.ToString(), user.OrganizationId);
     }
