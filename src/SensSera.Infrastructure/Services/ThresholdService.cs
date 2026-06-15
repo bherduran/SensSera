@@ -7,31 +7,33 @@ using SensSera.Infrastructure.Persistence;
 
 namespace SensSera.Infrastructure.Services;
 
-public class ThresholdService(AppDbContext db, ITenantContext tenant, TimeProvider timeProvider) : IThresholdService
+public sealed class ThresholdService(AppDbContext db, ITenantContext tenant, TimeProvider timeProvider) : IThresholdService
 {
-    public async Task<List<ThresholdResponse>> GetAllByGreenhouseAsync(Guid greenhouseId)
+    public async Task<List<ThresholdResponse>> GetAllByGreenhouseAsync(Guid greenhouseId, CancellationToken cancellationToken = default)
     {
         var orgId = tenant.RequireOrganizationId();
         return await db.Thresholds
+            .AsNoTracking()
             .Where(t=> t.GreenhouseId == greenhouseId && t.OrganizationId == orgId)
             .Select(t => ToResponse(t))
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
     }
 
-    public async Task<ThresholdResponse> GetByIdAsync(Guid id)
+    public async Task<ThresholdResponse> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var orgId = tenant.RequireOrganizationId();
         var t = await db.Thresholds
+            .AsNoTracking()
             .Where(t => t.Id == id && t.OrganizationId == orgId)
-            .FirstOrDefaultAsync()
+            .FirstOrDefaultAsync(cancellationToken)
             ?? throw new KeyNotFoundException($"Threshold {id} not found");
         return ToResponse(t);    
     }
 
-    public async Task<ThresholdResponse> CreateAsync(ThresholdRequest request)
+    public async Task<ThresholdResponse> CreateAsync(ThresholdRequest request, CancellationToken cancellationToken = default)
     {
         var orgId = tenant.RequireOrganizationId();
-        await VerifyGreenhouseOwnershipAsync(request.GreenhouseId, orgId);
+        await VerifyGreenhouseOwnershipAsync(request.GreenhouseId, orgId, cancellationToken);
 
         if (!Enum.TryParse<MetricType>(request.Metric, ignoreCase: true, out var metric))
             throw new ArgumentException($"Unknown metric: {request.Metric}");
@@ -52,16 +54,16 @@ public class ThresholdService(AppDbContext db, ITenantContext tenant, TimeProvid
         };
 
         db.Thresholds.Add(t);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
         return ToResponse(t);
     }
 
-    public async Task<ThresholdResponse> UpdateAsync(Guid id, ThresholdRequest request)
+    public async Task<ThresholdResponse> UpdateAsync(Guid id, ThresholdRequest request, CancellationToken cancellationToken = default)
     {
         var orgId = tenant.RequireOrganizationId();
         var t = await db.Thresholds
             .Where(t => t.Id == id && t.OrganizationId == orgId)
-            .FirstOrDefaultAsync()
+            .FirstOrDefaultAsync(cancellationToken)
             ?? throw new KeyNotFoundException($"Threshold {id} not found");
 
         if (!Enum.TryParse<MetricType>(request.Metric, ignoreCase: true, out var metric))
@@ -76,26 +78,26 @@ public class ThresholdService(AppDbContext db, ITenantContext tenant, TimeProvid
         t.IsEnabled = request.IsEnabled;
         t.UpdatedAt = timeProvider.GetUtcNow().UtcDateTime;
 
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
         return ToResponse(t);           
     }
 
-    public async Task DeleteAsync(Guid id)
+    public async Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
         var orgId = tenant.RequireOrganizationId();
         var t = await db.Thresholds
             .Where(t => t.Id == id && t.OrganizationId == orgId)
-            .FirstOrDefaultAsync()
+            .FirstOrDefaultAsync(cancellationToken)
             ?? throw new KeyNotFoundException($"Threshold {id} not found");
 
         db.Thresholds.Remove(t);
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
     }
 
-    private async Task VerifyGreenhouseOwnershipAsync(Guid greenhouseId, Guid orgId)
+    private async Task VerifyGreenhouseOwnershipAsync(Guid greenhouseId, Guid orgId, CancellationToken cancellationToken = default)
     {
         var exist = await db.Greenhouses
-            .AnyAsync(g => g.Id == greenhouseId && g.OrganizationId == orgId);
+            .AnyAsync(g => g.Id == greenhouseId && g.OrganizationId == orgId, cancellationToken);
         if (!exist)
             throw new KeyNotFoundException($"Greenhouse {greenhouseId} not found");
     }

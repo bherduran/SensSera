@@ -515,11 +515,7 @@ appsettings.Local.json
 
 # Personal learning notes (not part of the project deliverables)
 test.md
-<<<<<<< HEAD
 audit-2026-06-14.md
 
 # Simulator real config (template lives in appsettings.example.json)                                                                                   
 src/SensSera.Simulator/appsettings.json
-=======
-audit-2026-06-14.md
->>>>>>> e3db1fb ( feat:(thresholds) add CRUD service, controller, validator, DI)
