@@ -15,6 +15,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using System.IdentityModel.Tokens.Jwt;
 using SensSera.Application.Options;
+using SensSera.Api.BackgroundJobs;
 
 
 // Bootstrap logger — replaced by full Serilog config after host builds
@@ -109,6 +110,10 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IPasswordHasher, BCryptPasswordHasher>();
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IThresholdService, ThresholdService>();
+builder.Services.AddScoped<IAlertService, AlertService>();
+builder.Services.AddHostedService<ThresholdEvaluationJob>();
+builder.Services.AddHostedService<RollupJob>();
+builder.Services.AddHostedService<DeviceHeartbeatJob>();
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
