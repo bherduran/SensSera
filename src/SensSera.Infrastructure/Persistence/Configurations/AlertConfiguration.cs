@@ -9,7 +9,10 @@ public class AlertConfiguration : IEntityTypeConfiguration<Alert>
     public void Configure(EntityTypeBuilder<Alert> builder)
     {
         builder.HasKey(a => a.Id);
-        builder.HasIndex(a => new { a.OrganizationId, a.Status});
+        builder.HasIndex(a => new { a.OrganizationId, a.Status, a.TriggeredAt})
+            .IsDescending(false, false, true);
+
+        builder.HasIndex(a => new { a.OrganizationId, a.GreenhouseId});    
 
      
         builder.HasOne(a => a.Greenhouse)
