@@ -111,6 +111,8 @@ builder.Services.AddScoped<IPasswordHasher, BCryptPasswordHasher>();
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IThresholdService, ThresholdService>();
 builder.Services.AddScoped<IAlertService, AlertService>();
+builder.Services.AddScoped<IDashboardService, DashboardService>();
+builder.Services.AddScoped<IReadingService, ReadingService>();
 builder.Services.AddHostedService<ThresholdEvaluationJob>();
 builder.Services.AddHostedService<RollupJob>();
 builder.Services.AddHostedService<DeviceHeartbeatJob>();

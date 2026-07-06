@@ -8,11 +8,16 @@ namespace SensSera.Api.Controllers;
 [ApiController]
 [Route("api/devices")]
 [Authorize]
-public sealed class DevicesController(IDeviceService service) : ControllerBase
+public sealed class DevicesController(IDeviceService service, IReadingService readings) : ControllerBase
 {
     [HttpGet("greenhouse/{greenhouseId:guid}")]
     public async Task<IActionResult> GetByGreenhouse(Guid greenhouseId, CancellationToken cancellationToken) =>
         Ok(await service.GetAllByGreenhouseAsync(greenhouseId, cancellationToken));
+
+    [HttpGet("{id:guid}/readings")]
+    public async Task<IActionResult> GetReadings(
+        Guid id, [FromQuery] DeviceReadingsQuery query, CancellationToken cancellationToken) =>
+        Ok(await readings.GetDeviceReadingsAsync(id, query, cancellationToken));
 
     [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken) =>
