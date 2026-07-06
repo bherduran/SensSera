@@ -111,6 +111,8 @@ builder.Services.AddScoped<IPasswordHasher, BCryptPasswordHasher>();
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IThresholdService, ThresholdService>();
 builder.Services.AddScoped<IAlertService, AlertService>();
+builder.Services.AddScoped<IDashboardService, DashboardService>();
+builder.Services.AddScoped<IReadingService, ReadingService>();
 builder.Services.AddHostedService<ThresholdEvaluationJob>();
 builder.Services.AddHostedService<RollupJob>();
 builder.Services.AddHostedService<DeviceHeartbeatJob>();
@@ -132,8 +134,9 @@ var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
-    app.MapScalarApiReference();
+    // Dev-only docs; opt out of the default-deny fallback policy so the browser can reach them without a JWT.
+    app.MapOpenApi().AllowAnonymous();
+    app.MapScalarApiReference().AllowAnonymous();
 }
 
 // RFC 7807 Problem Details for all unhandled exceptions
