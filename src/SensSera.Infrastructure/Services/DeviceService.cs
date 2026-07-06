@@ -42,6 +42,7 @@ public sealed class DeviceService(AppDbContext db, ITenantContext tenant, TimePr
             Name = request.Name,
             GreenhouseId = request.GreenhouseId,
             OrganizationId = orgId,
+            Metric = request.Metric,
             Status = DeviceStatus.Active,
             CreatedAt = timeProvider.GetUtcNow().UtcDateTime,
             UpdatedAt = timeProvider.GetUtcNow().UtcDateTime,
@@ -54,7 +55,7 @@ public sealed class DeviceService(AppDbContext db, ITenantContext tenant, TimePr
         device.DeviceTokenHash = tokenHash;
         await db.SaveChangesAsync(cancellationToken);
 
-        return new DeviceWithTokenResponse(device.Id, device.Name, device.GreenhouseId, rawToken);
+        return new DeviceWithTokenResponse(device.Id, device.Name, device.GreenhouseId, device.Metric, rawToken);
     }
 
 
@@ -70,6 +71,7 @@ public sealed class DeviceService(AppDbContext db, ITenantContext tenant, TimePr
 
         d.Name = request.Name;
         d.GreenhouseId = request.GreenhouseId;
+        d.Metric = request.Metric;
         d.UpdatedAt = timeProvider.GetUtcNow().UtcDateTime;
 
         await db.SaveChangesAsync(cancellationToken);
@@ -101,7 +103,7 @@ public sealed class DeviceService(AppDbContext db, ITenantContext tenant, TimePr
         d.UpdatedAt = timeProvider.GetUtcNow().UtcDateTime;
 
         await db.SaveChangesAsync(cancellationToken);
-        return new DeviceWithTokenResponse(d.Id, d.Name, d.GreenhouseId, rawToken);
+        return new DeviceWithTokenResponse(d.Id, d.Name, d.GreenhouseId, d.Metric, rawToken);
     }
 
     private async Task VerifyGreenhouseOwnershipAsync(Guid greenhouseId, CancellationToken cancellationToken)
@@ -123,5 +125,5 @@ public sealed class DeviceService(AppDbContext db, ITenantContext tenant, TimePr
     }
 
     private static DeviceResponse ToResponse(Device d) =>
-        new(d.Id, d.Name, d.GreenhouseId, d.Status.ToString(), d.CreatedAt);
+        new(d.Id, d.Name, d.GreenhouseId, d.Metric, d.Status.ToString(), d.CreatedAt);
 }
