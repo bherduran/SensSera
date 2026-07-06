@@ -134,8 +134,9 @@ var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
-    app.MapScalarApiReference();
+    // Dev-only docs; opt out of the default-deny fallback policy so the browser can reach them without a JWT.
+    app.MapOpenApi().AllowAnonymous();
+    app.MapScalarApiReference().AllowAnonymous();
 }
 
 // RFC 7807 Problem Details for all unhandled exceptions
