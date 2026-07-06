@@ -13,7 +13,7 @@ public sealed class AuthController(IAuthService authService) : ControllerBase
 {   
     [AllowAnonymous]
     [HttpPost("register")]
-    public async Task<IActionResult> Register([FromBody] RegisterRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<LoginResponse>> Register([FromBody] RegisterRequest request, CancellationToken cancellationToken)
     {
         var (response, refreshToken) = await authService.RegisterAsync(request, cancellationToken);
         SetRefreshTokenCookie(refreshToken);
@@ -22,7 +22,7 @@ public sealed class AuthController(IAuthService authService) : ControllerBase
 
     [AllowAnonymous]
     [HttpPost("login")]
-    public async Task<IActionResult> Login([FromBody] LoginRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<LoginResponse>> Login([FromBody] LoginRequest request, CancellationToken cancellationToken)
     {
         var (response, refreshToken) = await authService.LoginAsync(request, cancellationToken);
         SetRefreshTokenCookie(refreshToken);
@@ -31,7 +31,7 @@ public sealed class AuthController(IAuthService authService) : ControllerBase
 
     [AllowAnonymous]
     [HttpPost("refresh")]
-    public async Task<IActionResult> Refresh(CancellationToken cancellationToken)
+    public async Task<ActionResult<RefreshResponse>> Refresh(CancellationToken cancellationToken)
     {
         var token = Request.Cookies["refreshToken"]
             ?? throw new UnauthorizedAccessException("Refresh token missing");
@@ -52,7 +52,7 @@ public sealed class AuthController(IAuthService authService) : ControllerBase
 
     [Authorize]
     [HttpGet("me")]
-    public async Task<IActionResult> Me(CancellationToken cancellationToken)
+    public async Task<ActionResult<MeResponse>> Me(CancellationToken cancellationToken)
     {
         var userIdStr = User.FindFirst("sub")?.Value;
         if (!Guid.TryParse(userIdStr, out var userId))

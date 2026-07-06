@@ -11,21 +11,21 @@ namespace SensSera.Api.Controllers;
 public sealed class DevicesController(IDeviceService service, IReadingService readings) : ControllerBase
 {
     [HttpGet("greenhouse/{greenhouseId:guid}")]
-    public async Task<IActionResult> GetByGreenhouse(Guid greenhouseId, CancellationToken cancellationToken) =>
+    public async Task<ActionResult<List<DeviceResponse>>> GetByGreenhouse(Guid greenhouseId, CancellationToken cancellationToken) =>
         Ok(await service.GetAllByGreenhouseAsync(greenhouseId, cancellationToken));
 
     [HttpGet("{id:guid}/readings")]
-    public async Task<IActionResult> GetReadings(
+    public async Task<ActionResult<DeviceReadingsResponse>> GetReadings(
         Guid id, [FromQuery] DeviceReadingsQuery query, CancellationToken cancellationToken) =>
         Ok(await readings.GetDeviceReadingsAsync(id, query, cancellationToken));
 
     [HttpGet("{id:guid}")]
-    public async Task<IActionResult> GetById(Guid id, CancellationToken cancellationToken) =>
+    public async Task<ActionResult<DeviceResponse>> GetById(Guid id, CancellationToken cancellationToken) =>
         Ok(await service.GetByIdAsync(id, cancellationToken));
 
     [HttpPost]
     [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> Create(DeviceRequest request, CancellationToken cancellationToken)
+    public async Task<ActionResult<DeviceWithTokenResponse>> Create(DeviceRequest request, CancellationToken cancellationToken)
     {
         var result = await service.CreateAsync(request, cancellationToken);
         return CreatedAtAction(nameof(GetById), new { id = result.Id }, result);
@@ -33,7 +33,7 @@ public sealed class DevicesController(IDeviceService service, IReadingService re
 
     [HttpPut("{id:guid}")]
     [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> Update(Guid id, DeviceRequest request, CancellationToken cancellationToken) =>
+    public async Task<ActionResult<DeviceResponse>> Update(Guid id, DeviceRequest request, CancellationToken cancellationToken) =>
         Ok(await service.UpdateAsync(id, request, cancellationToken));
 
     [HttpDelete("{id:guid}")]
@@ -46,8 +46,6 @@ public sealed class DevicesController(IDeviceService service, IReadingService re
 
     [HttpPost("{id:guid}/rotate-token")]
     [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> RotateToken(Guid id, CancellationToken cancellationToken) =>
+    public async Task<ActionResult<DeviceWithTokenResponse>> RotateToken(Guid id, CancellationToken cancellationToken) =>
         Ok(await service.RotateTokenAsync(id, cancellationToken));
-
-    
 }

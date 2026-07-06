@@ -12,6 +12,9 @@ public sealed class DeviceRequestValidator : AbstractValidator<DeviceRequest>
             .MaximumLength(100);
 
         RuleFor(x => x.GreenhouseId)
-            .NotEmpty();     
+            .NotEmpty();
+
+        RuleFor(x => x.Metric)
+            .IsInEnum();
     }
 }
