@@ -1,3 +1,5 @@
+using SensSera.Domain.Enums;
+
 namespace SensSera.Application.DTOs;
 
 // GET /api/dashboard — summary across all greenhouses in the tenant
@@ -10,7 +12,7 @@ public sealed record GreenhouseSummary(
     int ActiveAlerts,
     IReadOnlyList<MetricCurrent> Metrics);
 
-public sealed record MetricCurrent(string Metric, double Current);
+public sealed record MetricCurrent(MetricType Metric, double Current);
 
 // GET /api/dashboard/greenhouses/{id} — per-greenhouse detail
 public sealed record GreenhouseDetailResponse(
@@ -21,7 +23,7 @@ public sealed record GreenhouseDetailResponse(
     IReadOnlyList<AlertResponse> ActiveAlerts);
 
 public sealed record MetricSummary(
-    string Metric,
+    MetricType Metric,
     double Current,
     double Min24h,
     double Max24h,

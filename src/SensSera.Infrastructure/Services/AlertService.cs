@@ -69,6 +69,6 @@ public sealed class AlertService(AppDbContext db, ITenantContext tenant, TimePro
 
     private static AlertResponse ToResponse(Alert a) =>
         new(a.Id, a.GreenhouseId, a.DeviceId, a.ThresholdId,
-        a.Metric.ToString(), a.TriggeredValue, a.Severity.ToString(), a.Status.ToString(),
+        a.Metric, a.TriggeredValue, a.Severity, a.Status,
         a.TriggeredAt, a.ResolvedAt);
 }

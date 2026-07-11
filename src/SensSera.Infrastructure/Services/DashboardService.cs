@@ -70,7 +70,7 @@ public sealed class DashboardService(AppDbContext db, ITenantContext tenant, Tim
                 alertCounts.GetValueOrDefault(g.Id, 0),
                 currentByGreenhouse[g.Id]
                     .OrderBy(m => m.Metric)
-                    .Select(m => new MetricCurrent(m.Metric.ToString(), Math.Round(m.Current, 2)))
+                    .Select(m => new MetricCurrent(m.Metric, Math.Round(m.Current, 2)))
                     .ToList()))
             .ToList();
 
@@ -112,7 +112,7 @@ public sealed class DashboardService(AppDbContext db, ITenantContext tenant, Tim
                 var weightedAvg = totalCount > 0 ? g.Sum(x => x.Avg * x.Count) / totalCount : 0;
                 var current = g.OrderByDescending(x => x.PeriodStart).First().Avg;
                 return new MetricSummary(
-                    g.Key.ToString(),
+                    g.Key,
                     Math.Round(current, 2),
                     Math.Round(g.Min(x => x.Min), 2),
                     Math.Round(g.Max(x => x.Max), 2),
@@ -127,7 +127,7 @@ public sealed class DashboardService(AppDbContext db, ITenantContext tenant, Tim
             .OrderByDescending(a => a.TriggeredAt)
             .Select(a => new AlertResponse(
                 a.Id, a.GreenhouseId, a.DeviceId, a.ThresholdId,
-                a.Metric.ToString(), a.TriggeredValue, a.Severity.ToString(), a.Status.ToString(),
+                a.Metric, a.TriggeredValue, a.Severity, a.Status,
                 a.TriggeredAt, a.ResolvedAt))
             .ToListAsync(cancellationToken);
 

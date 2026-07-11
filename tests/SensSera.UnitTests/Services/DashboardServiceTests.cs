@@ -42,7 +42,7 @@ public class DashboardServiceTests : IDisposable
 
         result.Metrics.Should().ContainSingle();
         var m = result.Metrics[0];
-        m.Metric.Should().Be("Temperature");
+        m.Metric.Should().Be(MetricType.Temperature);
         m.Current.Should().Be(26);   // latest bucket avg
         m.Min24h.Should().Be(20);
         m.Max24h.Should().Be(30);

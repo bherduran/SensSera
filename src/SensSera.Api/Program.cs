@@ -16,6 +16,8 @@ using System.Text;
 using System.IdentityModel.Tokens.Jwt;
 using SensSera.Application.Options;
 using SensSera.Api.BackgroundJobs;
+using SensSera.Api.Hubs;
+using SensSera.Api.Realtime;
 
 
 // Bootstrap logger — replaced by full Serilog config after host builds
@@ -56,8 +58,24 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             IssuerSigningKey = new SymmetricSecurityKey(
                 Encoding.UTF8.GetBytes(jwtOptions.Key)), 
             RoleClaimType = "role",
-            NameClaimType = "sub",    
-        };    
+            NameClaimType = "sub",
+        };
+
+        // WebSockets can't send an Authorization header, so SignalR clients pass
+        // the JWT as ?access_token=. Only honour it on the hub path.
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                if (!string.IsNullOrEmpty(accessToken) &&
+                    context.HttpContext.Request.Path.StartsWithSegments("/hubs"))
+                {
+                    context.Token = accessToken;
+                }
+                return Task.CompletedTask;
+            }
+        };
     })
     .AddScheme<AuthenticationSchemeOptions, DeviceTokenAuthenticationHandler>(
         DeviceTokenAuthenticationHandler.SchemeName, _=> {});
@@ -113,6 +131,7 @@ builder.Services.AddScoped<IThresholdService, ThresholdService>();
 builder.Services.AddScoped<IAlertService, AlertService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IReadingService, ReadingService>();
+builder.Services.AddSingleton<IRealtimeNotifier, SignalRNotifier>();
 builder.Services.AddHostedService<ThresholdEvaluationJob>();
 builder.Services.AddHostedService<RollupJob>();
 builder.Services.AddHostedService<DeviceHeartbeatJob>();
@@ -129,6 +148,17 @@ builder.Services.AddCors(options =>
             .AllowCredentials()));
 
 builder.Services.AddOpenApi();
+
+// SignalR uses its own JSON protocol, separate from AddControllers().AddJsonOptions().
+// Mirror the same camelCase + string-enum settings so hub payloads match the REST contract.
+builder.Services.AddSignalR()
+    .AddJsonProtocol(options =>
+    {
+        options.PayloadSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+        options.PayloadSerializerOptions.Converters.Add(
+            new System.Text.Json.Serialization.JsonStringEnumConverter(
+                System.Text.Json.JsonNamingPolicy.CamelCase));
+    });
 
 var app = builder.Build();
 
@@ -148,6 +178,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();
 app.MapControllers();
+app.MapHub<TelemetryHub>("/hubs/telemetry");
 
 await DataSeeder.SeedAsync(app.Services);
 

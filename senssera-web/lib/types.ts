@@ -35,3 +35,60 @@ export type DeviceInput = Omit<Schemas["DeviceRequest"], "metric"> & {
 export type DeviceWithToken = Omit<Schemas["DeviceWithTokenResponse"], "metric"> & {
   metric: Metric;
 };
+
+// Alert enums serialize camelCase (JsonStringEnumConverter), mirroring the backend enums.
+export const ALERT_SEVERITIES = ["warning", "critical"] as const;
+export type AlertSeverity = (typeof ALERT_SEVERITIES)[number];
+
+export const ALERT_STATUSES = ["open", "acknowledged", "resolved"] as const;
+export type AlertStatus = (typeof ALERT_STATUSES)[number];
+
+// Dashboard/alert domain types. Derived from the schema (so a removed/renamed
+// field is a compile error) but with the enum fields narrowed to real unions and
+// the .NET `number | string` doubles collapsed to `number`.
+export type MetricCurrent = Omit<Schemas["MetricCurrent"], "metric" | "current"> & {
+  metric: Metric;
+  current: number;
+};
+
+export type GreenhouseSummary = Omit<
+  Schemas["GreenhouseSummary"],
+  "deviceCount" | "activeAlerts" | "metrics"
+> & {
+  deviceCount: number;
+  activeAlerts: number;
+  metrics: MetricCurrent[];
+};
+
+export type DashboardSummary = {
+  greenhouses: GreenhouseSummary[];
+};
+
+export type Alert = Omit<
+  Schemas["AlertResponse"],
+  "metric" | "severity" | "status" | "triggeredValue"
+> & {
+  metric: Metric;
+  severity: AlertSeverity;
+  status: AlertStatus;
+  triggeredValue: number;
+};
+
+export type MetricSummary = Omit<
+  Schemas["MetricSummary"],
+  "metric" | "current" | "min24h" | "max24h" | "avg24h"
+> & {
+  metric: Metric;
+  current: number;
+  min24h: number;
+  max24h: number;
+  avg24h: number;
+};
+
+export type GreenhouseDetail = Omit<
+  Schemas["GreenhouseDetailResponse"],
+  "metrics" | "activeAlerts"
+> & {
+  metrics: MetricSummary[];
+  activeAlerts: Alert[];
+};
