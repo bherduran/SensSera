@@ -52,7 +52,3 @@
   dotnet test SensSera.slnx
   ```
 
-  ## Progress
-
-  Build follows an 11-stage plan. Stages 1–5 complete (scaffold, EF Core + entities, CRUD, ingestion + simulator, JWT auth). Currently on **Stage 6 —
-  Multi-Tenant Isolation**.
