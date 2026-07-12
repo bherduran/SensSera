@@ -42,6 +42,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { DeviceFormDialog } from "@/components/devices/device-form-dialog";
 import { DeviceTokenDialog } from "@/components/devices/device-token-dialog";
+import { GreenhouseMonitoring } from "@/components/greenhouses/greenhouse-monitoring";
+import { ThresholdsSection } from "@/components/thresholds/thresholds-section";
 
 export default function GreenhouseDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -71,20 +73,22 @@ export default function GreenhouseDetailPage() {
         </Link>
       </div>
 
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            {greenhouse.data?.name ?? (
-              <Skeleton className="h-8 w-48" />
-            )}
-          </h1>
-          {greenhouse.data && (
-            <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
-              <MapPin className="h-3.5 w-3.5" />
-              {greenhouse.data.location || "No location set"}
-            </p>
-          )}
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">
+          {greenhouse.data?.name ?? <Skeleton className="h-8 w-48" />}
+        </h1>
+        {greenhouse.data && (
+          <p className="mt-1 flex items-center gap-1 text-sm text-muted-foreground">
+            <MapPin className="h-3.5 w-3.5" />
+            {greenhouse.data.location || "No location set"}
+          </p>
+        )}
+      </div>
+
+      <GreenhouseMonitoring greenhouseId={id} />
+
+      <div className="flex items-center justify-between gap-4 pt-2">
+        <h2 className="text-lg font-semibold">Devices</h2>
         {isAdmin && (
           <DeviceFormDialog
             greenhouseId={id}
@@ -160,6 +164,8 @@ export default function GreenhouseDetailPage() {
           </Table>
         </Card>
       )}
+
+      {isAdmin && <ThresholdsSection greenhouseId={id} />}
 
       <DeviceTokenDialog
         token={reveal?.token ?? null}

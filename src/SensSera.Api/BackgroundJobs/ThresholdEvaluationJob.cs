@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using SensSera.Application.DTOs;
+using SensSera.Application.Interfaces;
 using SensSera.Domain.Entities;
 using SensSera.Domain.Enums;
 using SensSera.Infrastructure.Persistence;
@@ -7,6 +9,7 @@ namespace SensSera.Api.BackgroundJobs;
 
 public sealed class ThresholdEvaluationJob(
     IServiceScopeFactory scopeFactory,
+    IRealtimeNotifier notifier,
     TimeProvider timeProvider,
     ILogger<ThresholdEvaluationJob> logger) : BackgroundService
 {
@@ -37,6 +40,8 @@ public sealed class ThresholdEvaluationJob(
             .AsNoTracking()
             .Where(t => t.IsEnabled)
             .ToListAsync(cancellationToken);
+
+        var raised = new List<Alert>();
 
         foreach (var t in thresholds)
         {
@@ -70,7 +75,7 @@ public sealed class ThresholdEvaluationJob(
 
             if (hasOpen) continue;
 
-            db.Alerts.Add(new Alert
+            var alert = new Alert
             {
                 OrganizationId = t.OrganizationId,
                 GreenhouseId = t.GreenhouseId,
@@ -83,9 +88,31 @@ public sealed class ThresholdEvaluationJob(
                 TriggeredAt = now,
                 CreatedAt = now,
                 UpdatedAt = now,
-            });
-        }    
+            };
+            db.Alerts.Add(alert);
+            raised.Add(alert);
+        }
 
         await db.SaveChangesAsync(cancellationToken);
+
+        // Ids are populated after save; push each new alert to its tenant.
+        foreach (var alert in raised)
+            await PushAlertAsync(alert, cancellationToken);
+    }
+
+    // An alert is already persisted; a real-time push failure must not stop the cycle.
+    private async Task PushAlertAsync(Alert alert, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await notifier.AlertRaisedAsync(
+                alert.OrganizationId,
+                new AlertRaisedEvent(alert.Id, alert.GreenhouseId, alert.Metric, alert.Severity, alert.TriggeredAt),
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Real-time push failed for alert {AlertId}", alert.Id);
+        }
     }
 }

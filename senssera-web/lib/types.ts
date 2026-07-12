@@ -35,3 +35,104 @@ export type DeviceInput = Omit<Schemas["DeviceRequest"], "metric"> & {
 export type DeviceWithToken = Omit<Schemas["DeviceWithTokenResponse"], "metric"> & {
   metric: Metric;
 };
+
+// Alert enums serialize camelCase (JsonStringEnumConverter), mirroring the backend enums.
+export const ALERT_SEVERITIES = ["warning", "critical"] as const;
+export type AlertSeverity = (typeof ALERT_SEVERITIES)[number];
+
+export const ALERT_STATUSES = ["open", "acknowledged", "resolved"] as const;
+export type AlertStatus = (typeof ALERT_STATUSES)[number];
+
+// Dashboard/alert domain types. Derived from the schema (so a removed/renamed
+// field is a compile error) but with the enum fields narrowed to real unions and
+// the .NET `number | string` doubles collapsed to `number`.
+export type MetricCurrent = Omit<Schemas["MetricCurrent"], "metric" | "current"> & {
+  metric: Metric;
+  current: number;
+};
+
+export type GreenhouseSummary = Omit<
+  Schemas["GreenhouseSummary"],
+  "deviceCount" | "activeAlerts" | "metrics"
+> & {
+  deviceCount: number;
+  activeAlerts: number;
+  metrics: MetricCurrent[];
+};
+
+export type DashboardSummary = {
+  greenhouses: GreenhouseSummary[];
+};
+
+export type Alert = Omit<
+  Schemas["AlertResponse"],
+  "metric" | "severity" | "status" | "triggeredValue"
+> & {
+  metric: Metric;
+  severity: AlertSeverity;
+  status: AlertStatus;
+  triggeredValue: number;
+};
+
+export type MetricSummary = Omit<
+  Schemas["MetricSummary"],
+  "metric" | "current" | "min24h" | "max24h" | "avg24h"
+> & {
+  metric: Metric;
+  current: number;
+  min24h: number;
+  max24h: number;
+  avg24h: number;
+};
+
+export type GreenhouseDetail = Omit<
+  Schemas["GreenhouseDetailResponse"],
+  "metrics" | "activeAlerts"
+> & {
+  metrics: MetricSummary[];
+  activeAlerts: Alert[];
+};
+
+// Rollup time-series for one metric (chart source). Doubles collapsed to number.
+export type RollupPoint = {
+  periodStart: string;
+  min: number;
+  max: number;
+  avg: number;
+  count: number;
+};
+
+export type GreenhouseReadings = Omit<
+  Schemas["GreenhouseReadingsResponse"],
+  "points"
+> & {
+  points: RollupPoint[];
+};
+
+export type Threshold = Omit<
+  Schemas["ThresholdResponse"],
+  "metric" | "minValue" | "maxValue"
+> & {
+  metric: Metric;
+  minValue: number | null;
+  maxValue: number | null;
+};
+
+export type ThresholdInput = Omit<
+  Schemas["ThresholdRequest"],
+  "metric" | "minValue" | "maxValue"
+> & {
+  metric: Metric;
+  minValue: number | null;
+  maxValue: number | null;
+};
+
+export type AlertsPage = Omit<
+  Schemas["PagedResponseOfAlertResponse"],
+  "items" | "total" | "page" | "pageSize"
+> & {
+  items: Alert[];
+  total: number;
+  page: number;
+  pageSize: number;
+};

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { AppShell } from "@/components/app/app-shell";
+import { TelemetryProvider } from "@/components/app/telemetry-provider";
 
 export default function AppLayout({
   children,
@@ -26,5 +27,9 @@ export default function AppLayout({
     );
   }
 
-  return <AppShell>{children}</AppShell>;
+  return (
+    <TelemetryProvider>
+      <AppShell>{children}</AppShell>
+    </TelemetryProvider>
+  );
 }

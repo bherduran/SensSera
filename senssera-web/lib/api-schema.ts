@@ -973,7 +973,11 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["ThresholdResponse"][];
+                        "application/json": components["schemas"]["ThresholdResponse"][];
+                        "text/json": components["schemas"]["ThresholdResponse"][];
+                    };
                 };
             };
         };
@@ -1008,7 +1012,11 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["ThresholdResponse"];
+                        "application/json": components["schemas"]["ThresholdResponse"];
+                        "text/json": components["schemas"]["ThresholdResponse"];
+                    };
                 };
             };
         };
@@ -1034,7 +1042,11 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["ThresholdResponse"];
+                        "application/json": components["schemas"]["ThresholdResponse"];
+                        "text/json": components["schemas"]["ThresholdResponse"];
+                    };
                 };
             };
         };
@@ -1093,7 +1105,11 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["ThresholdResponse"];
+                        "application/json": components["schemas"]["ThresholdResponse"];
+                        "text/json": components["schemas"]["ThresholdResponse"];
+                    };
                 };
             };
         };
@@ -1116,16 +1132,18 @@ export interface components {
             deviceId: string;
             /** Format: uuid */
             thresholdId: string;
-            metric: string;
+            metric: components["schemas"]["MetricType"];
             /** Format: double */
             triggeredValue: number | string;
-            severity: string;
-            status: string;
+            severity: components["schemas"]["AlertSeverity"];
+            status: components["schemas"]["AlertStatus"];
             /** Format: date-time */
             triggeredAt: string;
             /** Format: date-time */
             resolvedAt: null | string;
         };
+        AlertSeverity: number;
+        AlertStatus: number;
         DashboardSummaryResponse: {
             greenhouses: components["schemas"]["GreenhouseSummary"][];
         };
@@ -1227,12 +1245,12 @@ export interface components {
             organizationId: string;
         };
         MetricCurrent: {
-            metric: string;
+            metric: components["schemas"]["MetricType"];
             /** Format: double */
             current: number | string;
         };
         MetricSummary: {
-            metric: string;
+            metric: components["schemas"]["MetricType"];
             /** Format: double */
             current: number | string;
             /** Format: double */
@@ -1283,12 +1301,26 @@ export interface components {
         ThresholdRequest: {
             /** Format: uuid */
             greenhouseId: string;
-            metric: string;
+            metric: components["schemas"]["MetricType"];
             /** Format: double */
             minValue: null | number | string;
             /** Format: double */
             maxValue: null | number | string;
             isEnabled: boolean;
+        };
+        ThresholdResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            greenhouseId: string;
+            metric: components["schemas"]["MetricType"];
+            /** Format: double */
+            minValue: null | number | string;
+            /** Format: double */
+            maxValue: null | number | string;
+            isEnabled: boolean;
+            /** Format: date-time */
+            createdAt: string;
         };
         UserInfo: {
             /** Format: uuid */
