@@ -13,10 +13,10 @@ import type {
   MetricCurrent,
   Metric,
 } from "@/lib/types";
-import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { LiveIndicator } from "@/components/app/live-indicator";
 
 export default function DashboardPage() {
   const qc = useQueryClient();
@@ -41,17 +41,9 @@ export default function DashboardPage() {
       toast.warning(`Alert · ${meta?.label ?? event.metric}`, {
         description: `A ${event.severity} threshold was breached.`,
       });
-      qc.setQueryData<DashboardSummary>(dashboardKey, (prev) =>
-        prev
-          ? {
-              greenhouses: prev.greenhouses.map((g) =>
-                g.greenhouseId === event.greenhouseId
-                  ? { ...g, activeAlerts: g.activeAlerts + 1 }
-                  : g,
-              ),
-            }
-          : prev,
-      );
+      // Refetch the true count rather than optimistically incrementing — an
+      // increment misses alerts that fired while the connection was down.
+      qc.invalidateQueries({ queryKey: dashboardKey });
     },
   });
 
@@ -109,32 +101,6 @@ export default function DashboardPage() {
         </div>
       )}
     </div>
-  );
-}
-
-function LiveIndicator({ connected }: { connected: boolean }) {
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium",
-        connected
-          ? "border-success/30 bg-success/10 text-success"
-          : "border-border bg-muted text-muted-foreground",
-      )}
-    >
-      <span className="relative flex h-2 w-2">
-        {connected && (
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-75" />
-        )}
-        <span
-          className={cn(
-            "relative inline-flex h-2 w-2 rounded-full",
-            connected ? "bg-success" : "bg-muted-foreground/50",
-          )}
-        />
-      </span>
-      {connected ? "Live" : "Offline"}
-    </span>
   );
 }
 

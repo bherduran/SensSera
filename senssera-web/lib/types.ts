@@ -92,3 +92,47 @@ export type GreenhouseDetail = Omit<
   metrics: MetricSummary[];
   activeAlerts: Alert[];
 };
+
+// Rollup time-series for one metric (chart source). Doubles collapsed to number.
+export type RollupPoint = {
+  periodStart: string;
+  min: number;
+  max: number;
+  avg: number;
+  count: number;
+};
+
+export type GreenhouseReadings = Omit<
+  Schemas["GreenhouseReadingsResponse"],
+  "points"
+> & {
+  points: RollupPoint[];
+};
+
+export type Threshold = Omit<
+  Schemas["ThresholdResponse"],
+  "metric" | "minValue" | "maxValue"
+> & {
+  metric: Metric;
+  minValue: number | null;
+  maxValue: number | null;
+};
+
+export type ThresholdInput = Omit<
+  Schemas["ThresholdRequest"],
+  "metric" | "minValue" | "maxValue"
+> & {
+  metric: Metric;
+  minValue: number | null;
+  maxValue: number | null;
+};
+
+export type AlertsPage = Omit<
+  Schemas["PagedResponseOfAlertResponse"],
+  "items" | "total" | "page" | "pageSize"
+> & {
+  items: Alert[];
+  total: number;
+  page: number;
+  pageSize: number;
+};

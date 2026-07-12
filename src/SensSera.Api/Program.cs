@@ -29,6 +29,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Host.UseSerilog((ctx, cfg) =>
     cfg.ReadFrom.Configuration(ctx.Configuration)
+        // AspNetCore request logs include the full query string — and SignalR sends the
+        // JWT as ?access_token=. Drop them to Warning so tokens never reach the logs.
+        .MinimumLevel.Override("Microsoft.AspNetCore", Serilog.Events.LogEventLevel.Warning)
         .WriteTo.Console());
 
 // Inject system clock — services use TimeProvider, never DateTime.UtcNow directly

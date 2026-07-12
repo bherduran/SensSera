@@ -1,8 +1,10 @@
+using SensSera.Domain.Enums;
+
 namespace SensSera.Application.DTOs;
 
 public record ThresholdRequest(
     Guid GreenhouseId,
-    string Metric,
+    MetricType Metric,
     double? MinValue,
     double? MaxValue,
     bool IsEnabled);
@@ -10,10 +12,8 @@ public record ThresholdRequest(
 public record ThresholdResponse(
     Guid Id,
     Guid GreenhouseId,
-    string Metric,
+    MetricType Metric,
     double? MinValue,
     double? MaxValue,
     bool IsEnabled,
     DateTime CreatedAt);
-
-    

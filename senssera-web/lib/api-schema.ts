@@ -973,7 +973,11 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["ThresholdResponse"][];
+                        "application/json": components["schemas"]["ThresholdResponse"][];
+                        "text/json": components["schemas"]["ThresholdResponse"][];
+                    };
                 };
             };
         };
@@ -1008,7 +1012,11 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["ThresholdResponse"];
+                        "application/json": components["schemas"]["ThresholdResponse"];
+                        "text/json": components["schemas"]["ThresholdResponse"];
+                    };
                 };
             };
         };
@@ -1034,7 +1042,11 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["ThresholdResponse"];
+                        "application/json": components["schemas"]["ThresholdResponse"];
+                        "text/json": components["schemas"]["ThresholdResponse"];
+                    };
                 };
             };
         };
@@ -1093,7 +1105,11 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["ThresholdResponse"];
+                        "application/json": components["schemas"]["ThresholdResponse"];
+                        "text/json": components["schemas"]["ThresholdResponse"];
+                    };
                 };
             };
         };
@@ -1285,12 +1301,26 @@ export interface components {
         ThresholdRequest: {
             /** Format: uuid */
             greenhouseId: string;
-            metric: string;
+            metric: components["schemas"]["MetricType"];
             /** Format: double */
             minValue: null | number | string;
             /** Format: double */
             maxValue: null | number | string;
             isEnabled: boolean;
+        };
+        ThresholdResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            greenhouseId: string;
+            metric: components["schemas"]["MetricType"];
+            /** Format: double */
+            minValue: null | number | string;
+            /** Format: double */
+            maxValue: null | number | string;
+            isEnabled: boolean;
+            /** Format: date-time */
+            createdAt: string;
         };
         UserInfo: {
             /** Format: uuid */

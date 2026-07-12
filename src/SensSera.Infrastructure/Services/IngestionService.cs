@@ -36,7 +36,9 @@ public sealed class IngestionService(
 
         await db.Devices
             .Where(d => d.Id == deviceId)
-            .ExecuteUpdateAsync(s => s.SetProperty(d => d.LastSeenAt, timeProvider.GetUtcNow().UtcDateTime), cancellationToken);
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(d => d.LastSeenAt, timeProvider.GetUtcNow().UtcDateTime)
+                .SetProperty(d => d.Status, DeviceStatus.Active), cancellationToken);
 
         await db.SaveChangesAsync(cancellationToken);
 

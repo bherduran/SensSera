@@ -35,9 +35,6 @@ public sealed class ThresholdService(AppDbContext db, ITenantContext tenant, Tim
         var orgId = tenant.RequireOrganizationId();
         await VerifyGreenhouseOwnershipAsync(request.GreenhouseId, orgId, cancellationToken);
 
-        if (!Enum.TryParse<MetricType>(request.Metric, ignoreCase: true, out var metric))
-            throw new ArgumentException($"Unknown metric: {request.Metric}");
-
         if (request.MinValue is null && request.MaxValue is null)
             throw new ArgumentException("At least one of MinValue or MaxValue must be set");
 
@@ -45,7 +42,7 @@ public sealed class ThresholdService(AppDbContext db, ITenantContext tenant, Tim
         {
             OrganizationId = orgId,
             GreenhouseId = request.GreenhouseId,
-            Metric = metric,
+            Metric = request.Metric,
             MinValue = request.MinValue,
             MaxValue = request.MaxValue,
             IsEnabled = request.IsEnabled,
@@ -66,13 +63,10 @@ public sealed class ThresholdService(AppDbContext db, ITenantContext tenant, Tim
             .FirstOrDefaultAsync(cancellationToken)
             ?? throw new KeyNotFoundException($"Threshold {id} not found");
 
-        if (!Enum.TryParse<MetricType>(request.Metric, ignoreCase: true, out var metric))
-            throw new ArgumentException($"Unknown metric: {request.Metric}");
-
         if (request.MinValue is null && request.MaxValue is null)
             throw new ArgumentException("At least one of MinValue or MaxValue must be set");
 
-        t.Metric = metric;
+        t.Metric = request.Metric;
         t.MinValue = request.MinValue;            
         t.MaxValue = request.MaxValue; 
         t.IsEnabled = request.IsEnabled;
@@ -90,6 +84,12 @@ public sealed class ThresholdService(AppDbContext db, ITenantContext tenant, Tim
             .FirstOrDefaultAsync(cancellationToken)
             ?? throw new KeyNotFoundException($"Threshold {id} not found");
 
+        // Alerts reference the threshold via a RESTRICT FK, so remove the
+        // threshold's alert history first; otherwise the delete is blocked.
+        await db.Alerts
+            .Where(a => a.ThresholdId == id)
+            .ExecuteDeleteAsync(cancellationToken);
+
         db.Thresholds.Remove(t);
         await db.SaveChangesAsync(cancellationToken);
     }
@@ -103,6 +103,6 @@ public sealed class ThresholdService(AppDbContext db, ITenantContext tenant, Tim
     }
 
     private static ThresholdResponse ToResponse(Threshold t) =>
-        new(t.Id, t.GreenhouseId, t.Metric.ToString(), t.MinValue, t.MaxValue, t.IsEnabled, t.CreatedAt);
+        new(t.Id, t.GreenhouseId, t.Metric, t.MinValue, t.MaxValue, t.IsEnabled, t.CreatedAt);
 
 }
