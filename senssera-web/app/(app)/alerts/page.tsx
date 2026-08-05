@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Bell, Check, CheckCheck } from "lucide-react";
+import { Bell, Check, CheckCheck, Sparkles } from "lucide-react";
 import {
   useAlerts,
   useAcknowledgeAlert,
@@ -33,6 +33,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { LiveIndicator } from "@/components/app/live-indicator";
+import { ExplainAlertDialog } from "@/components/insights/explain-alert-dialog";
 
 const PAGE_SIZE = 20;
 const STATUS_OPTIONS = ["open", "acknowledged", "resolved"] as const;
@@ -254,6 +255,14 @@ function AlertRow({ alert, greenhouse }: { alert: Alert; greenhouse?: string }) 
       </TableCell>
       <TableCell className="text-right">
         <div className="flex justify-end gap-1">
+          <ExplainAlertDialog
+            alertId={alert.id}
+            trigger={
+              <Button variant="ghost" size="icon" aria-label="Explain">
+                <Sparkles className="h-4 w-4" />
+              </Button>
+            }
+          />
           {alert.status === "open" && (
             <Button
               variant="ghost"
