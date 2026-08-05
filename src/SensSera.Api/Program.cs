@@ -6,6 +6,7 @@ using SensSera.Api.Middleware;
 using SensSera.Application.Interfaces;
 using SensSera.Infrastructure.Services;
 using FluentValidation;
+using FluentValidation.AspNetCore;
 using SensSera.Api.Validators;
 using SensSera.Api.Auth;
 using Microsoft.AspNetCore.Authentication;
@@ -18,6 +19,8 @@ using SensSera.Application.Options;
 using SensSera.Api.BackgroundJobs;
 using SensSera.Api.Hubs;
 using SensSera.Api.Realtime;
+using Anthropic;
+using System.Threading.RateLimiting;
 
 
 // Bootstrap logger — replaced by full Serilog config after host builds
@@ -104,6 +107,14 @@ builder.Services.AddRateLimiter(options =>
         o.PermitLimit = 10;
         o.Window = TimeSpan.FromMinutes(1);
     });
+    // Insight "Ask" calls the LLM (slow + costs money) — cap per tenant, not per IP,
+    // partitioned on the trusted org_id claim so one org can't drain another's budget.
+    options.AddPolicy("insights", httpContext =>
+    {
+        var orgId = httpContext.User.FindFirst("org_id")?.Value ?? "anonymous";
+        return RateLimitPartition.GetFixedWindowLimiter(orgId, _ =>
+            new FixedWindowRateLimiterOptions { PermitLimit = 20, Window = TimeSpan.FromMinutes(1) });
+    });
 });
 
 // 1 MB payload limit applied globally
@@ -120,6 +131,9 @@ builder.Services.AddControllers(options =>
 });
 
 builder.Services.AddValidatorsFromAssemblyContaining<GreenhouseRequestValidator>();
+// Registration alone only puts validators in DI — this makes MVC actually run them on model
+// binding (400 on failure). Without it every FluentValidation rule is dead code.
+builder.Services.AddFluentValidationAutoValidation();
 
 // Services
 builder.Services.AddHttpContextAccessor();
@@ -135,6 +149,43 @@ builder.Services.AddScoped<IAlertService, AlertService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IReadingService, ReadingService>();
 builder.Services.AddSingleton<IRealtimeNotifier, SignalRNotifier>();
+
+// LLM insight layer (§7.10). Non-secret config bound + validated on start (mirrors JwtOptions).
+builder.Services.AddOptions<LlmOptions>()
+    .Bind(builder.Configuration.GetSection(LlmOptions.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+
+// The API key is read once here at the composition root and never bound into a logged options
+// object. Provider is a config switch: "Groq" (free, OpenAI-compatible — dev/testing) or the
+// default Anthropic path.
+var llmProvider = builder.Configuration["Llm:Provider"];
+var llmApiKey = builder.Configuration["Llm:ApiKey"];
+
+if (string.Equals(llmProvider, "Groq", StringComparison.OrdinalIgnoreCase))
+{
+    // Typed HttpClient carries Groq's OpenAI-compatible base address + bearer key.
+    builder.Services.AddHttpClient<ILlmClient, GroqLlmClient>(client =>
+    {
+        client.BaseAddress = new Uri("https://api.groq.com/openai/v1/");
+        if (!string.IsNullOrWhiteSpace(llmApiKey))
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", llmApiKey);
+    });
+}
+else
+{
+    // AnthropicClient holds the key (user-secrets in dev, Key Vault in prod). When absent, the
+    // SDK falls back to the ANTHROPIC_API_KEY environment variable.
+    builder.Services.AddSingleton(_ =>
+        string.IsNullOrWhiteSpace(llmApiKey)
+            ? new AnthropicClient()
+            : new AnthropicClient { ApiKey = llmApiKey });
+    builder.Services.AddScoped<ILlmClient, AnthropicLlmClient>();
+}
+
+builder.Services.AddMemoryCache();
+builder.Services.AddScoped<IInsightService, InsightService>();
 builder.Services.AddHostedService<ThresholdEvaluationJob>();
 builder.Services.AddHostedService<RollupJob>();
 builder.Services.AddHostedService<DeviceHeartbeatJob>();
