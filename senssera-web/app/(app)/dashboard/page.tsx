@@ -17,6 +17,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LiveIndicator } from "@/components/app/live-indicator";
+import { AskPanel } from "@/components/insights/ask-panel";
 
 export default function DashboardPage() {
   const qc = useQueryClient();
@@ -58,6 +59,8 @@ export default function DashboardPage() {
         </div>
         <LiveIndicator connected={connected} />
       </div>
+
+      <AskPanel />
 
       {isLoading && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

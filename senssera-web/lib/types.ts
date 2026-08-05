@@ -136,3 +136,7 @@ export type AlertsPage = Omit<
   page: number;
   pageSize: number;
 };
+
+// LLM insight layer (§7.10) — derived from the generated schema so contract drift is a compile error.
+export type AlertExplanation = Schemas["AlertExplanationDto"];
+export type AskResponse = Schemas["AskResponse"];
