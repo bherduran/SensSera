@@ -1,0 +1,65 @@
+name: Deploy API
+
+# Backend → Azure App Service on every merge to main that touches the API.
+# Auth is OIDC (federated credential): GitHub mints a short-lived token per run and Azure only
+# trusts it for this repo's main branch, so no long-lived Azure secret is stored anywhere.
+# The frontend deploys through Vercel's Git integration, not this workflow.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "Directory.Build.props"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+permissions:
+  id-token: write # request the OIDC token
+  contents: read
+
+concurrency:
+  group: deploy-api
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://${{ vars.AZURE_WEBAPP_NAME }}.azurewebsites.net/api/health
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.x"
+
+      - name: Unit tests
+        run: dotnet test tests/SensSera.UnitTests
+
+      - name: Publish
+        run: dotnet publish src/SensSera.Api -c Release -o publish
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy to App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+          package: publish
+
+      # Migrations run on start; a failed start shows up here instead of in production traffic.
+      - name: Health check
+        run: |
+          for i in $(seq 1 18); do
+            if curl -fsS "https://${{ vars.AZURE_WEBAPP_NAME }}.azurewebsites.net/api/health"; then exit 0; fi
+            sleep 10
+          done
+          echo "API did not become healthy" >&2
+          exit 1
