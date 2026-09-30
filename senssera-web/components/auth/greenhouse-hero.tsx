@@ -123,7 +123,7 @@ export function GreenhouseHero({ className }: { className?: string }) {
     <div
       ref={wrapRef}
       className={cn(
-        "relative cursor-grab touch-pan-y select-none data-[dragging]:cursor-grabbing [mask-image:radial-gradient(ellipse_75%_72%_at_50%_45%,black_62%,transparent_100%)]",
+        "relative cursor-grab touch-pan-y select-none data-[dragging]:cursor-grabbing [mask-image:linear-gradient(to_right,black_68%,transparent_98%),linear-gradient(to_bottom,black_78%,transparent_99%)] [mask-composite:intersect]",
         className,
       )}
     >

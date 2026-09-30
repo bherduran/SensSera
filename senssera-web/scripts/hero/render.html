@@ -73,7 +73,7 @@ key.shadow.radius = 8;
 key.shadow.blurSamples = 25;
 key.shadow.bias = -0.0003;
 key.shadow.normalBias = 0.02;
-Object.assign(key.shadow.camera, { left: -5, right: 5, top: 5, bottom: -5, near: 1, far: 25 });
+Object.assign(key.shadow.camera, { left: -9, right: 9, top: 9, bottom: -9, near: 1, far: 30 });
 scene.add(key);
 const fill = new THREE.DirectionalLight(theme === "light" ? "#f2ece2" : "#6d7a8a", theme === "light" ? 0.6 : 0.35);
 fill.position.set(6, 3, 4);
