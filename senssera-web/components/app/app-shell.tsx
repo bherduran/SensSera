@@ -2,19 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  Leaf,
-  LayoutDashboard,
-  Sprout,
-  Bell,
-  Menu,
-  LogOut,
-  User as UserIcon,
-} from "lucide-react";
+import { Menu, LogOut, User as UserIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/app/theme-toggle";
 import {
   DropdownMenu,
@@ -25,53 +16,40 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-type NavItem = {
-  href: string;
-  label: string;
-  icon: React.ElementType;
-  soon?: boolean;
-};
+const NAV = [
+  { href: "/dashboard", label: "Dashboard" },
+  { href: "/greenhouses", label: "Greenhouses" },
+  { href: "/alerts", label: "Alerts" },
+] as const;
 
-const NAV: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/greenhouses", label: "Greenhouses", icon: Sprout },
-  { href: "/alerts", label: "Alerts", icon: Bell },
-];
-
+/** The notebook's table of contents: numbered entries, the open one underlined in ink. */
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   return (
-    <nav className="flex flex-col gap-1">
-      {NAV.map(({ href, label, icon: Icon, soon }) => {
+    <nav aria-label="Main" className="flex flex-col gap-1">
+      <p className="label-caps mb-2 px-2">Contents</p>
+      {NAV.map(({ href, label }, i) => {
         const active = pathname === href || pathname.startsWith(`${href}/`);
-        if (soon) {
-          return (
-            <span
-              key={href}
-              className="flex cursor-not-allowed items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground/60"
-            >
-              <Icon className="h-4 w-4" />
-              {label}
-              <Badge variant="secondary" className="ml-auto text-[10px]">
-                Soon
-              </Badge>
-            </span>
-          );
-        }
         return (
           <Link
             key={href}
             href={href}
             onClick={onNavigate}
+            aria-current={active ? "page" : undefined}
             className={cn(
-              "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-              active
-                ? "bg-primary/10 text-primary"
-                : "text-muted-foreground hover:bg-accent hover:text-foreground",
+              "group flex items-baseline gap-3 px-2 py-1.5 transition-colors",
+              active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
             )}
           >
-            <Icon className="h-4 w-4" />
-            {label}
+            <span className="font-mono text-[11px]">{String(i + 1).padStart(2, "0")}</span>
+            <span
+              className={cn(
+                "font-serif text-[19px] leading-tight decoration-[1.5px] underline-offset-[5px]",
+                active ? "underline" : "group-hover:underline group-hover:decoration-border",
+              )}
+            >
+              {label}
+            </span>
           </Link>
         );
       })}
@@ -81,12 +59,10 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
 
 function Brand() {
   return (
-    <div className="flex items-center gap-2 px-2 py-1">
-      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
-        <Leaf className="h-5 w-5 text-primary" />
-      </div>
-      <span className="text-lg font-bold text-foreground">SensSera</span>
-    </div>
+    <Link href="/dashboard" className="block px-2">
+      <span className="font-serif text-[26px] leading-none tracking-[-0.01em]">SensSera</span>
+      <span className="label-caps mt-1 block">Greenhouse notebook</span>
+    </Link>
   );
 }
 
@@ -120,14 +96,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen">
       {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col gap-6 border-r border-sidebar-border bg-sidebar p-4 md:flex">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col gap-10 border-r border-sidebar-border bg-sidebar px-4 py-7 md:flex">
         <Brand />
         <NavLinks />
       </aside>
 
       {/* Main column */}
-      <div className="flex min-h-screen flex-col md:pl-64">
-        <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-border bg-background/80 px-4 backdrop-blur">
+      <div className="flex min-h-screen flex-col md:pl-60">
+        <header className="sticky top-0 z-20 flex h-14 items-center gap-2 bg-background/85 px-4 backdrop-blur-sm">
           {/* Mobile nav */}
           <div className="md:hidden">
             <DropdownMenu>

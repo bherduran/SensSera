@@ -2,19 +2,12 @@
 
 import Link from "next/link";
 import { toast } from "sonner";
-import {
-  Sprout,
-  Plus,
-  MapPin,
-  Pencil,
-  Trash2,
-  ChevronRight,
-} from "lucide-react";
+import { Plus, Pencil, Trash2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useGreenhouses, useDeleteGreenhouse } from "@/hooks/use-greenhouses";
 import type { Greenhouse } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertDialog,
@@ -28,6 +21,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { GreenhouseFormDialog } from "@/components/greenhouses/greenhouse-form-dialog";
+import { SpecimenHeader } from "@/components/notebook/specimen-header";
 
 export default function GreenhousesPage() {
   const { user } = useAuth();
@@ -36,50 +30,42 @@ export default function GreenhousesPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Greenhouses</h1>
-          <p className="text-sm text-muted-foreground">
-            Manage your greenhouses and their devices.
-          </p>
-        </div>
-        {isAdmin && (
-          <GreenhouseFormDialog
-            trigger={
-              <Button>
-                <Plus className="mr-1 h-4 w-4" />
-                New greenhouse
-              </Button>
-            }
-          />
-        )}
-      </div>
+      <SpecimenHeader
+        code="Collection"
+        subtitle={data ? `${data.length} specimen${data.length === 1 ? "" : "s"}` : undefined}
+        title="Greenhouses"
+        aside={
+          isAdmin && (
+            <GreenhouseFormDialog
+              trigger={
+                <Button>
+                  <Plus className="mr-1 h-4 w-4" />
+                  New greenhouse
+                </Button>
+              }
+            />
+          )
+        }
+      />
 
       {isLoading && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-40 w-full rounded-xl" />
+            <Skeleton key={i} className="h-40 w-full rounded-md" />
           ))}
         </div>
       )}
 
       {isError && (
-        <Card className="p-6 text-center text-sm text-muted-foreground">
-          Could not load greenhouses. Please refresh.
-        </Card>
+        <p className="font-serif text-lg italic text-alert-text">
+          Greenhouses couldn’t be loaded. Refresh the page to try again.
+        </p>
       )}
 
       {data && data.length === 0 && (
-        <Card className="flex flex-col items-center gap-3 p-10 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-            <Sprout className="h-6 w-6 text-primary" />
-          </div>
-          <div>
-            <p className="font-medium">No greenhouses yet</p>
-            <p className="text-sm text-muted-foreground">
-              Create your first greenhouse to start monitoring.
-            </p>
-          </div>
+        <Card className="items-center gap-3 p-10 text-center">
+          <p className="font-serif text-2xl">The collection is empty.</p>
+          <p className="text-sm text-muted-foreground">Create your first greenhouse to start monitoring.</p>
           {isAdmin && (
             <GreenhouseFormDialog
               trigger={
@@ -95,8 +81,8 @@ export default function GreenhousesPage() {
 
       {data && data.length > 0 && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {data.map((g) => (
-            <GreenhouseCard key={g.id} greenhouse={g} isAdmin={isAdmin} />
+          {data.map((g, i) => (
+            <GreenhouseCard key={g.id} greenhouse={g} index={i} isAdmin={isAdmin} />
           ))}
         </div>
       )}
@@ -106,9 +92,11 @@ export default function GreenhousesPage() {
 
 function GreenhouseCard({
   greenhouse,
+  index,
   isAdmin,
 }: {
   greenhouse: Greenhouse;
+  index: number;
   isAdmin: boolean;
 }) {
   const del = useDeleteGreenhouse();
@@ -123,32 +111,19 @@ function GreenhouseCard({
   }
 
   return (
-    <Card className="group gap-0 overflow-hidden py-0 transition-colors hover:border-primary/40">
-      <CardHeader className="flex-row items-center gap-3 space-y-0 p-5">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-          <Sprout className="h-5 w-5 text-primary" />
-        </div>
-        <div className="min-w-0">
-          <p className="truncate font-semibold">{greenhouse.name}</p>
-          <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
-            <MapPin className="h-3 w-3 shrink-0" />
-            {greenhouse.location || "No location set"}
-          </p>
-        </div>
-      </CardHeader>
-
-      <CardContent className="px-5 pb-4">
-        <Link
-          href={`/greenhouses/${greenhouse.id}`}
-          className="inline-flex items-center text-sm font-medium text-primary hover:underline"
-        >
-          View devices
-          <ChevronRight className="ml-0.5 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-        </Link>
-      </CardContent>
+    <Card className="gap-0 py-0">
+      <Link href={`/greenhouses/${greenhouse.id}`} className="group block px-5 pt-5 pb-4">
+        <p className="label-caps truncate">
+          GH-{String(index + 1).padStart(2, "0")} · {greenhouse.location || "no location"}
+        </p>
+        <p className="mt-1.5 truncate font-serif text-[26px] leading-tight">{greenhouse.name}</p>
+        <p className="mt-4 font-serif text-[15px] italic text-muted-foreground group-hover:text-foreground">
+          Open notebook →
+        </p>
+      </Link>
 
       {isAdmin && (
-        <CardFooter className="justify-end gap-1 border-t bg-muted/30 px-3 py-2">
+        <div className="flex justify-end gap-1 border-t border-dashed px-3 py-1.5">
           <GreenhouseFormDialog
             greenhouse={greenhouse}
             trigger={
@@ -187,7 +162,7 @@ function GreenhouseCard({
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
-        </CardFooter>
+        </div>
       )}
     </Card>
   );
