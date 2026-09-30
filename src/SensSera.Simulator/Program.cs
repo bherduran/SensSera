@@ -4,7 +4,8 @@ using Microsoft.Extensions.Configuration;
 
 var config = new ConfigurationBuilder()
     .SetBasePath(AppContext.BaseDirectory)
-    .AddJsonFile("appsettings.json")
+    .AddJsonFile("appsettings.json", optional: true)
+    .AddEnvironmentVariables(prefix: "SIMULATOR_")
     .Build();
 
 var apiBaseUrl = config["ApiBaseUrl"] ?? "http://localhost:5010";
@@ -15,10 +16,29 @@ var devices = config.GetSection("Devices").Get<List<DeviceConfig>>() ?? [];
 
 using var http = new HttpClient { BaseAddress = new Uri(apiBaseUrl) };
 
-Console.WriteLine($"Simulator starting - {devices.Count} device(s), interval={intervalSeconds}s, alertMode={alertMode}");
-
 var cts = new CancellationTokenSource();
 Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
+
+// No tokens configured → provision demo devices through the API (retries while the API boots).
+if (devices.Count == 0)
+{
+    var email = config["Demo:Email"] ?? "admin@demo.com";
+    var password = config["Demo:Password"] ?? "Admin1234!";
+    for (var attempt = 1; devices.Count == 0 && !cts.Token.IsCancellationRequested; attempt++)
+    {
+        try
+        {
+            devices = await DemoBootstrap.RunAsync(http, email, password, cts.Token);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException && attempt < 30)
+        {
+            Console.WriteLine($"Demo bootstrap attempt {attempt} failed: {ex.Message} - retrying in 2s");
+            await Task.Delay(TimeSpan.FromSeconds(2), cts.Token).ContinueWith(_ => { });
+        }
+    }
+}
+
+Console.WriteLine($"Simulator starting - {devices.Count} device(s), interval={intervalSeconds}s, alertMode={alertMode}");
 
 while (!cts.Token.IsCancellationRequested)
 {
