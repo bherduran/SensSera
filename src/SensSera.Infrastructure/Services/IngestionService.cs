@@ -26,7 +26,7 @@ public sealed class IngestionService(
             OrganizationId = organizationId,
             Metric = metric,
             Value = request.Value,
-            RecordedAt = request.RecordedAt,
+            RecordedAt = ToUtc(request.RecordedAt),
             IngestedAt = now,
             CreatedAt = now,
             UpdatedAt = now,
@@ -56,6 +56,16 @@ public sealed class IngestionService(
         foreach (var r in request.Readings)
             await IngestAsync(deviceId, organizationId, r, cancellationToken);
     }
+
+    // System.Text.Json yields Kind=Local for offsets like "+03:00" and Kind=Unspecified when no
+    // offset is given; Npgsql only accepts UTC for timestamptz. Devices are expected to send UTC,
+    // so an offset-less value is taken as UTC rather than the server's local zone.
+    private static DateTime ToUtc(DateTime value) => value.Kind switch
+    {
+        DateTimeKind.Utc => value,
+        DateTimeKind.Local => value.ToUniversalTime(),
+        _ => DateTime.SpecifyKind(value, DateTimeKind.Utc),
+    };
 
     // The reading is already persisted; a real-time push failure must not fail ingestion.
     private async Task PushReadingAsync(
