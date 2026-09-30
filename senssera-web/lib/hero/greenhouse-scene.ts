@@ -136,7 +136,7 @@ export class GreenhouseScene {
     this.key.shadow.radius = 6;
     this.key.shadow.bias = -0.0003;
     this.key.shadow.normalBias = 0.02;
-    Object.assign(this.key.shadow.camera, { left: -5, right: 5, top: 5, bottom: -5, near: 1, far: 25 });
+    Object.assign(this.key.shadow.camera, { left: -9, right: 9, top: 9, bottom: -9, near: 1, far: 30 });
     this.fill = new THREE.DirectionalLight("#f2ece2", 0.6);
     this.fill.position.set(6, 3, 4);
     // Night: the greenhouse is lit from inside.
