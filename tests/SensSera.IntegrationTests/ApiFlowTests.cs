@@ -61,6 +61,30 @@ public sealed class ApiFlowTests(SensSeraApiFactory factory)
     }
 
     [Fact]
+    public async Task IngestBatch_WritesEveryReading()
+    {
+        var (client, _) = await RegisterAsync();
+        var greenhouseId = await CreateGreenhouseAsync(client);
+        var (deviceId, deviceToken) = await CreateDeviceAsync(client, greenhouseId, "Co2");
+        var now = DateTime.UtcNow;
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/ingest/batch")
+        {
+            Content = JsonContent.Create(new
+            {
+                readings = Enumerable.Range(0, 5)
+                    .Select(i => new { metric = "Co2", value = 800.0 + i, recordedAt = now.AddSeconds(-i) }),
+            }),
+        };
+        request.Headers.Add("X-Device-Token", deviceToken);
+
+        (await factory.CreateClient().SendAsync(request)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        var readings = await client.GetFromJsonAsync<JsonElement>($"/api/devices/{deviceId}/readings");
+        readings.GetProperty("readings").GetArrayLength().Should().Be(5);
+    }
+
+    [Fact]
     public async Task IngestBatch_WithOneInvalidReading_RejectsWholeBatch()
     {
         var (client, _) = await RegisterAsync();

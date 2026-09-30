@@ -14,30 +14,35 @@ public sealed class IngestionService(
     TimeProvider timeProvider,
     ILogger<IngestionService> logger) : IIngestionService
 {
-    public async Task IngestAsync(Guid deviceId, Guid organizationId, IngestRequest request, CancellationToken cancellationToken = default)
-    {
-        if(!Enum.TryParse<MetricType>(request.Metric, ignoreCase: true, out var metric))
-            throw new ArgumentException($"Unknown metric: {request.Metric}");
+    public Task IngestAsync(Guid deviceId, Guid organizationId, IngestRequest request, CancellationToken cancellationToken = default) =>
+        IngestManyAsync(deviceId, organizationId, [request], cancellationToken);
 
+    public Task IngestBatchAsync(Guid deviceId, Guid organizationId, IngestBatchRequest request, CancellationToken cancellationToken = default) =>
+        IngestManyAsync(deviceId, organizationId, request.Readings, cancellationToken);
+
+    // One INSERT batch + one LastSeenAt update per request, however many readings it carries.
+    private async Task IngestManyAsync(
+        Guid deviceId, Guid organizationId, IReadOnlyList<IngestRequest> requests, CancellationToken cancellationToken)
+    {
         var now = timeProvider.GetUtcNow().UtcDateTime;
-        var reading = new SensorReading
+        var readings = requests.Select(r => new SensorReading
         {
             DeviceId = deviceId,
             OrganizationId = organizationId,
-            Metric = metric,
-            Value = request.Value,
-            RecordedAt = ToUtc(request.RecordedAt),
+            Metric = ParseMetric(r.Metric),
+            Value = r.Value,
+            RecordedAt = ToUtc(r.RecordedAt),
             IngestedAt = now,
             CreatedAt = now,
             UpdatedAt = now,
-        };
+        }).ToList();
 
-        db.SensorReadings.Add(reading);
+        db.SensorReadings.AddRange(readings);
 
         await db.Devices
             .Where(d => d.Id == deviceId)
             .ExecuteUpdateAsync(s => s
-                .SetProperty(d => d.LastSeenAt, timeProvider.GetUtcNow().UtcDateTime)
+                .SetProperty(d => d.LastSeenAt, now)
                 .SetProperty(d => d.Status, DeviceStatus.Active), cancellationToken);
 
         await db.SaveChangesAsync(cancellationToken);
@@ -48,14 +53,14 @@ public sealed class IngestionService(
             .Select(d => d.GreenhouseId)
             .FirstOrDefaultAsync(cancellationToken);
 
-        await PushReadingAsync(organizationId, greenhouseId, reading, metric, cancellationToken);
+        foreach (var reading in readings)
+            await PushReadingAsync(organizationId, greenhouseId, reading, cancellationToken);
     }
 
-    public async Task IngestBatchAsync(Guid deviceId, Guid organizationId, IngestBatchRequest request, CancellationToken cancellationToken = default)
-    {
-        foreach (var r in request.Readings)
-            await IngestAsync(deviceId, organizationId, r, cancellationToken);
-    }
+    private static MetricType ParseMetric(string metric) =>
+        Enum.TryParse<MetricType>(metric, ignoreCase: true, out var parsed)
+            ? parsed
+            : throw new ArgumentException($"Unknown metric: {metric}");
 
     // System.Text.Json yields Kind=Local for offsets like "+03:00" and Kind=Unspecified when no
     // offset is given; Npgsql only accepts UTC for timestamptz. Devices are expected to send UTC,
@@ -69,13 +74,13 @@ public sealed class IngestionService(
 
     // The reading is already persisted; a real-time push failure must not fail ingestion.
     private async Task PushReadingAsync(
-        Guid organizationId, Guid greenhouseId, SensorReading reading, MetricType metric, CancellationToken cancellationToken)
+        Guid organizationId, Guid greenhouseId, SensorReading reading, CancellationToken cancellationToken)
     {
         try
         {
             await notifier.ReadingReceivedAsync(
                 organizationId,
-                new ReadingReceivedEvent(greenhouseId, reading.DeviceId, metric, reading.Value, reading.RecordedAt),
+                new ReadingReceivedEvent(greenhouseId, reading.DeviceId, reading.Metric, reading.Value, reading.RecordedAt),
                 cancellationToken);
         }
         catch (Exception ex)
