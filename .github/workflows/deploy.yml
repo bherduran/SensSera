@@ -29,9 +29,9 @@ jobs:
       name: production
       url: https://${{ vars.AZURE_WEBAPP_NAME }}.azurewebsites.net/api/health
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: "10.x"
 
@@ -42,7 +42,7 @@ jobs:
         run: dotnet publish src/SensSera.Api -c Release -o publish
 
       - name: Azure login (OIDC)
-        uses: azure/login@v2
+        uses: azure/login@v3
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
