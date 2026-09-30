@@ -13,7 +13,7 @@ export function FieldNote({ label = "Field note — AI", children, pending, clas
   return (
     <figure className={cn("border-l-2 border-alert bg-alert/[0.07] px-4 py-3", className)}>
       <figcaption className="label-caps text-alert-text">{label}</figcaption>
-      <blockquote className="mt-1.5 font-serif text-[17px] leading-snug italic text-foreground">
+      <blockquote className="mt-1.5 whitespace-pre-line font-serif text-[17px] leading-snug italic text-foreground">
         {pending ? <span className="text-muted-foreground motion-safe:animate-pulse">Writing…</span> : children}
       </blockquote>
     </figure>
