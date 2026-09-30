@@ -11,13 +11,16 @@ public sealed class ThresholdEvaluationJob(
     IServiceScopeFactory scopeFactory,
     IRealtimeNotifier notifier,
     TimeProvider timeProvider,
+    IConfiguration configuration,
     ILogger<ThresholdEvaluationJob> logger) : BackgroundService
 {
-    private static readonly TimeSpan Interval = TimeSpan.FromSeconds(30);
+    // 30s by default; integration tests shorten it to observe an alert without a long wait.
+    private readonly TimeSpan _interval = TimeSpan.FromSeconds(
+        configuration.GetValue("Jobs:ThresholdEvaluationIntervalSeconds", 30));
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        using var timer = new PeriodicTimer(Interval);
+        using var timer = new PeriodicTimer(_interval);
         while (!stoppingToken.IsCancellationRequested)
         {
             try { await EvaluateOnceAsync(stoppingToken); }
