@@ -5,7 +5,7 @@ import { Sparkles, Loader2, SendHorizontal } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useAskInsights } from "@/hooks/use-insights";
+import { insightErrorMessage, useAskInsights } from "@/hooks/use-insights";
 
 const SUGGESTIONS = [
   "Which greenhouse was hottest in the last 24 hours?",
@@ -88,7 +88,7 @@ export function AskPanel() {
 
       {ask.isError && (
         <p className="text-sm text-destructive">
-          Couldn&rsquo;t answer that. Please try again.
+          {insightErrorMessage(ask.error, "Couldn’t answer that. Please try again.")}
         </p>
       )}
 

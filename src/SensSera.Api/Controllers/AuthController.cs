@@ -35,7 +35,8 @@ public sealed class AuthController(IAuthService authService) : ControllerBase
     {
         var token = Request.Cookies["refreshToken"]
             ?? throw new UnauthorizedAccessException("Refresh token missing");
-        var response = await authService.RefreshAsync(token, cancellationToken);
+        var (response, newRefreshToken) = await authService.RefreshAsync(token, cancellationToken);
+        SetRefreshTokenCookie(newRefreshToken);
         return Ok(response);
     }
 

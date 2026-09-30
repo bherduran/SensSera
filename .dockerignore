@@ -1,0 +1,13 @@
+**/bin/
+**/obj/
+**/node_modules/
+**/.next/
+**/.git
+**/.vs/
+**/.vscode/
+**/*.user
+# Local secrets / dev-only config never enter an image; containers are configured via env vars.
+**/appsettings.Development.json
+**/appsettings.Local.json
+src/SensSera.Simulator/appsettings.json
+**/.env*

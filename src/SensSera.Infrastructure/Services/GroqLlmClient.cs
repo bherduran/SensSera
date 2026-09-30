@@ -110,13 +110,25 @@ public sealed class GroqLlmClient(HttpClient http, IOptions<LlmOptions> options)
         }
 
         using var content = new StringContent(body.ToJsonString(Json), Encoding.UTF8, "application/json");
-        using var response = await http.PostAsync("chat/completions", content, cancellationToken);
+        HttpResponseMessage response;
+        try
+        {
+            response = await http.PostAsync("chat/completions", content, cancellationToken);
+        }
+        catch (Exception ex) when (ex is HttpRequestException
+                                   || (ex is TaskCanceledException && !cancellationToken.IsCancellationRequested))
+        {
+            throw new LlmUnavailableException("Groq request failed.", ex);
+        }
 
-        var payload = await response.Content.ReadAsStringAsync(cancellationToken);
-        if (!response.IsSuccessStatusCode)
-            throw new HttpRequestException($"Groq request failed ({(int)response.StatusCode}): {payload}");
+        using (response)
+        {
+            var payload = await response.Content.ReadAsStringAsync(cancellationToken);
+            if (!response.IsSuccessStatusCode)
+                throw new LlmUnavailableException($"Groq request failed ({(int)response.StatusCode}): {payload}");
 
-        return JsonDocument.Parse(payload);
+            return JsonDocument.Parse(payload);
+        }
     }
 
     private static JsonArray BuildTools(IReadOnlyList<LlmTool> tools)

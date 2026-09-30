@@ -97,6 +97,9 @@ builder.Services.AddAuthorization(options =>
 // Rate limiters: 100 req/min for ingest, 10 req/min for auth (brute force protection)
 builder.Services.AddRateLimiter(options =>
 {
+    // The middleware default is 503, which clients read as "server down" rather than "slow down".
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
     options.AddFixedWindowLimiter("ingest", o =>
     {
         o.PermitLimit = 100;
@@ -104,7 +107,7 @@ builder.Services.AddRateLimiter(options =>
     });
     options.AddFixedWindowLimiter("auth", o=>
     {
-        o.PermitLimit = 10;
+        o.PermitLimit = builder.Configuration.GetValue("RateLimiting:AuthPermitLimit", 10);
         o.Window = TimeSpan.FromMinutes(1);
     });
     // Insight "Ask" calls the LLM (slow + costs money) — cap per tenant, not per IP,
@@ -193,10 +196,14 @@ builder.Services.AddHostedService<DeviceHeartbeatJob>();
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Allow Next.js dev server — credentials needed for refresh-token cookie flow
+// Browser origins allowed to call the API with credentials (refresh-token cookie flow).
+// Defaults to the Next.js dev server; prod sets Cors:AllowedOrigins to the exact frontend URL(s).
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+    is { Length: > 0 } origins ? origins : ["http://localhost:3000"];
+
 builder.Services.AddCors(options =>
-    options.AddPolicy("LocalDev", policy =>
-        policy.WithOrigins("http://localhost:3000")
+    options.AddPolicy("Frontend", policy =>
+        policy.WithOrigins(allowedOrigins)
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials()));
@@ -222,11 +229,15 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi().AllowAnonymous();
     app.MapScalarApiReference().AllowAnonymous();
 }
+else
+{
+    app.UseHsts();
+}
 
 // RFC 7807 Problem Details for all unhandled exceptions
 app.UseMiddleware<ExceptionMiddleware>();
 
-app.UseCors("LocalDev");
+app.UseCors("Frontend");
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
@@ -234,6 +245,18 @@ app.UseRateLimiter();
 app.MapControllers();
 app.MapHub<TelemetryHub>("/hubs/telemetry");
 
-await DataSeeder.SeedAsync(app.Services);
+// Containers opt in to applying migrations on start; locally `dotnet ef database update` stays explicit.
+if (app.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
+{
+    await using var scope = app.Services.CreateAsyncScope();
+    await scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.MigrateAsync();
+}
+
+// The demo org/admin has a well-known password — never create it outside dev/demo setups.
+if (app.Environment.IsDevelopment() || app.Configuration.GetValue<bool>("Seed:DemoData"))
+    await DataSeeder.SeedAsync(app.Services);
 
 app.Run();
+
+// Exposes the entry point to WebApplicationFactory in integration tests.
+public partial class Program;

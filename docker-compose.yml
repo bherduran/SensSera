@@ -1,4 +1,9 @@
 name: senssera
+
+# Full local stack: `docker compose up -d --build`, then open http://localhost:3000
+# and sign in as the seeded demo admin. Secrets come from ./.env (see .env.example).
+# `docker compose up -d db` still gives just the database for running the API from the IDE.
+
 services:
   db:
     image: postgres:18
@@ -9,9 +14,59 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql 
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U senssera -d senssera"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: src/SensSera.Api/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Local demo over plain HTTP: Development keeps the refresh cookie non-Secure/Lax,
+      # enables Scalar at /scalar and seeds the demo org. Never use this profile in prod.
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__DefaultConnection: Host=db;Port=5432;Database=senssera;Username=senssera;Password=senssera_dev
+      Database__MigrateOnStartup: "true"
+      Jwt__Key: ${JWT_KEY:-local-compose-only-signing-key-change-me-0123456789}
+      Jwt__Issuer: SensSera
+      Jwt__Audience: SensSera
+      Cors__AllowedOrigins__0: http://localhost:3000
+      Llm__Provider: ${LLM_PROVIDER:-Groq}
+      Llm__Model: ${LLM_MODEL:-openai/gpt-oss-120b}
+      Llm__ApiKey: ${LLM_API_KEY:-}
+    ports:
+      - "5010:8080"
+
+  simulator:
+    build:
+      context: .
+      dockerfile: src/SensSera.Simulator/Dockerfile
+    depends_on:
+      - api
+    # No device tokens configured → the simulator provisions demo devices through the API.
+    environment:
+      SIMULATOR_ApiBaseUrl: http://api:8080
+      SIMULATOR_IntervalSeconds: "5"
+    command: ["--alert-mode"]
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./senssera-web
+      args:
+        # Inlined into the browser bundle, so it must be the host-reachable API URL.
+        NEXT_PUBLIC_API_URL: http://localhost:5010
+    depends_on:
+      - api
+    ports:
+      - "3000:3000"
 
 volumes:
   postgres_data:
-
-      

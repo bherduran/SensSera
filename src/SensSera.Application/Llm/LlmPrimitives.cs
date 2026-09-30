@@ -25,3 +25,11 @@ public sealed record LlmCompletion(
     string Model,
     LlmUsage Usage,
     IReadOnlyList<string> UsedTools);
+
+/// <summary>
+/// The model provider could not be reached or rejected the call (missing/invalid key, outage,
+/// rate limit). Adapters translate vendor exceptions into this so the API maps it to 503
+/// without knowing which provider is configured.
+/// </summary>
+public sealed class LlmUnavailableException(string message, Exception? innerException = null)
+    : Exception(message, innerException);

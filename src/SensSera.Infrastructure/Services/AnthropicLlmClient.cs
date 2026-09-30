@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Anthropic;
+using Anthropic.Exceptions;
 using Anthropic.Models.Messages;
 using Microsoft.Extensions.Options;
 using SensSera.Application.Interfaces;
@@ -19,13 +20,13 @@ public sealed class AnthropicLlmClient(AnthropicClient client, IOptions<LlmOptio
 
     public async Task<LlmCompletion> CompleteAsync(LlmPrompt prompt, CancellationToken cancellationToken = default)
     {
-        var response = await client.Messages.Create(new MessageCreateParams
+        var response = await CreateAsync(new MessageCreateParams
         {
             Model = _options.Model,
             MaxTokens = prompt.MaxTokens,
             System = prompt.System,
             Messages = [new() { Role = Role.User, Content = prompt.User }],
-        }, cancellationToken: cancellationToken);
+        }, cancellationToken);
 
         return new LlmCompletion(
             ExtractText(response.Content),
@@ -48,14 +49,14 @@ public sealed class AnthropicLlmClient(AnthropicClient client, IOptions<LlmOptio
 
         for (var iteration = 0; iteration < _options.MaxToolIterations; iteration++)
         {
-            var response = await client.Messages.Create(new MessageCreateParams
+            var response = await CreateAsync(new MessageCreateParams
             {
                 Model = _options.Model,
                 MaxTokens = prompt.MaxTokens,
                 System = prompt.System,
                 Messages = messages,
                 Tools = toolDefs,
-            }, cancellationToken: cancellationToken);
+            }, cancellationToken);
 
             model = response.Model ?? model;
             totalInput += (int)response.Usage.InputTokens;
@@ -98,6 +99,20 @@ public sealed class AnthropicLlmClient(AnthropicClient client, IOptions<LlmOptio
 
         // Iteration cap hit without a final answer — the service degrades gracefully.
         return new LlmCompletion(string.Empty, model, new LlmUsage(totalInput, totalOutput), usedTools.Distinct().ToList());
+    }
+
+    // Vendor failures (missing/invalid key, outage, rate limit) surface as a provider-agnostic
+    // exception so the API can answer 503 instead of a generic 500.
+    private async Task<Message> CreateAsync(MessageCreateParams parameters, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await client.Messages.Create(parameters, cancellationToken: cancellationToken);
+        }
+        catch (AnthropicException ex)
+        {
+            throw new LlmUnavailableException("Anthropic request failed.", ex);
+        }
     }
 
     private static string ExtractText(IReadOnlyList<ContentBlock> content) =>

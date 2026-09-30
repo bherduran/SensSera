@@ -16,7 +16,7 @@ namespace SensSera.Api.Controllers;
 public sealed class IngestController(IIngestionService service) : ControllerBase
 {
     [HttpPost]
-    public async Task<IActionResult> Ingest(IngestRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> Ingest([FromBody] IngestRequest request, CancellationToken cancellationToken)
     {
         var deviceId = Guid.Parse(User.FindFirstValue("device_id")!);
         var orgId = Guid.Parse(User.FindFirstValue("org_id")!);
@@ -26,7 +26,7 @@ public sealed class IngestController(IIngestionService service) : ControllerBase
     }
 
     [HttpPost("batch")]
-    public async Task<IActionResult> IngestBatch(IngestBatchRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> IngestBatch([FromBody] IngestBatchRequest request, CancellationToken cancellationToken)
     {
         var deviceId = Guid.Parse(User.FindFirstValue("device_id")!);
         var orgId = Guid.Parse(User.FindFirstValue("org_id")!);

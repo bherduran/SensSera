@@ -10,7 +10,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { useExplainAlert } from "@/hooks/use-insights";
+import { insightErrorMessage, useExplainAlert } from "@/hooks/use-insights";
 
 export function ExplainAlertDialog({
   alertId,
@@ -52,7 +52,7 @@ export function ExplainAlertDialog({
 
         {explain.isError && (
           <p className="py-6 text-sm text-destructive">
-            Couldn&rsquo;t generate an explanation. Please try again.
+            {insightErrorMessage(explain.error, "Couldn’t generate an explanation. Please try again.")}
           </p>
         )}
 
