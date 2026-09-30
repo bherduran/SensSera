@@ -28,7 +28,8 @@ jobs:
 
       # Testcontainers starts postgres:18 on the runner's Docker daemon.
       - name: Integration tests
-        run: dotnet test tests/SensSera.IntegrationTests --no-build
+        # Fail fast with a dump instead of hanging the runner if a test ever stalls.
+        run: dotnet test tests/SensSera.IntegrationTests --no-build --blame-hang-timeout 5m
 
       - name: Vulnerable packages
         run: |

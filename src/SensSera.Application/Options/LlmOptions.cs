@@ -19,17 +19,18 @@ public sealed class LlmOptions
     public string Provider { get; set; } = "Anthropic";
 
     /// <summary>Model id for the active <see cref="Provider"/>. Authoritative ids come from config,
-    /// never hardcoded (Anthropic e.g. "claude-opus-4-8"; Groq e.g. "llama-3.3-70b-versatile").</summary>
+    /// never hardcoded (Anthropic e.g. "claude-opus-5"; Groq e.g. "llama-3.3-70b-versatile").</summary>
     [Required]
-    public string Model { get; set; } = "claude-opus-4-8";
+    public string Model { get; set; } = "claude-opus-5";
 
     /// <summary>Hours of recent readings to ground an alert explanation on.</summary>
     [Range(1, 168)]
     public int ExplanationWindowHours { get; set; } = 6;
 
-    /// <summary>Cap on model output tokens — interpretation is short, so keep it bounded.</summary>
+    /// <summary>Cap on model output tokens — interpretation is short, so keep it bounded. Current
+    /// Claude models think by default and thinking counts toward this cap, so leave headroom.</summary>
     [Range(128, 8192)]
-    public int MaxOutputTokens { get; set; } = 1024;
+    public int MaxOutputTokens { get; set; } = 4096;
 
     /// <summary>Max whitelisted tool round-trips for one "Ask" question (bounds cost/latency).</summary>
     [Range(1, 10)]
