@@ -86,6 +86,12 @@ public sealed class DeviceService(AppDbContext db, ITenantContext tenant, TimePr
             .FirstOrDefaultAsync(cancellationToken)
             ?? throw new KeyNotFoundException($"Device {id} not found");
 
+        // Alerts reference the device via a RESTRICT FK, so the device's alert history goes first;
+        // readings and rollups cascade.
+        await db.Alerts
+            .Where(a => a.DeviceId == id)
+            .ExecuteDeleteAsync(cancellationToken);
+
         db.Devices.Remove(d);
         await db.SaveChangesAsync(cancellationToken);
     }
@@ -125,5 +131,5 @@ public sealed class DeviceService(AppDbContext db, ITenantContext tenant, TimePr
     }
 
     private static DeviceResponse ToResponse(Device d) =>
-        new(d.Id, d.Name, d.GreenhouseId, d.Metric, d.Status.ToString(), d.CreatedAt);
+        new(d.Id, d.Name, d.GreenhouseId, d.Metric, d.Status, d.CreatedAt);
 }

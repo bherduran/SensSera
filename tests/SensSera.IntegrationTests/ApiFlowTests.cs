@@ -136,6 +136,82 @@ public sealed class ApiFlowTests(SensSeraApiFactory factory)
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
+    // Alerts hold RESTRICT FKs to their device and threshold; deletes must clear them, not fail.
+    [Fact]
+    public async Task DeleteDevice_WithAlerts_Succeeds()
+    {
+        var (client, _) = await RegisterAsync();
+        var greenhouseId = await CreateGreenhouseAsync(client);
+        var (deviceId, deviceToken) = await CreateDeviceAsync(client, greenhouseId, "Temperature");
+        await RaiseAlertAsync(client, greenhouseId, deviceToken);
+
+        (await client.DeleteAsync($"/api/devices/{deviceId}")).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        (await client.GetFromJsonAsync<JsonElement>("/api/alerts")).GetProperty("total").GetInt32().Should().Be(0);
+    }
+
+    [Fact]
+    public async Task DeleteGreenhouse_WithAlerts_Succeeds()
+    {
+        var (client, _) = await RegisterAsync();
+        var greenhouseId = await CreateGreenhouseAsync(client);
+        var (_, deviceToken) = await CreateDeviceAsync(client, greenhouseId, "Temperature");
+        await RaiseAlertAsync(client, greenhouseId, deviceToken);
+
+        (await client.DeleteAsync($"/api/greenhouses/{greenhouseId}")).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        (await client.GetAsync($"/api/greenhouses/{greenhouseId}")).StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task SecondThresholdForSameMetric_Returns409()
+    {
+        var (client, _) = await RegisterAsync();
+        var greenhouseId = await CreateGreenhouseAsync(client);
+        var threshold = new { greenhouseId, metric = "Humidity", minValue = 40, maxValue = 80, isEnabled = true };
+
+        (await client.PostAsJsonAsync("/api/thresholds", threshold)).StatusCode.Should().Be(HttpStatusCode.Created);
+        (await client.PostAsJsonAsync("/api/thresholds", threshold)).StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
+    [Fact]
+    public async Task RegisterWithTakenEmail_Returns409()
+    {
+        var body = new { organizationName = "Dup Org", email = $"{Guid.NewGuid():N}@it.test", password = "Passw0rd!123" };
+
+        (await factory.CreateClient().PostAsJsonAsync("/api/auth/register", body)).EnsureSuccessStatusCode();
+        (await factory.CreateClient().PostAsJsonAsync("/api/auth/register", body)).StatusCode.Should().Be(HttpStatusCode.Conflict);
+    }
+
+    [Fact]
+    public async Task Device_StatusSerializesAsCamelCaseEnum()
+    {
+        var (client, _) = await RegisterAsync();
+        var greenhouseId = await CreateGreenhouseAsync(client);
+        await CreateDeviceAsync(client, greenhouseId, "Light");
+
+        var devices = await client.GetFromJsonAsync<JsonElement>($"/api/devices/greenhouse/{greenhouseId}");
+        devices.EnumerateArray().Should().ContainSingle().Subject
+            .GetProperty("status").GetString().Should().Be("active");
+    }
+
+    // Threshold 10–30, reading 41 → waits until the evaluation job (1 s in tests) has raised the alert.
+    private async Task RaiseAlertAsync(HttpClient client, Guid greenhouseId, string deviceToken)
+    {
+        (await client.PostAsJsonAsync("/api/thresholds",
+            new { greenhouseId, metric = "Temperature", minValue = 10, maxValue = 30, isEnabled = true }))
+            .EnsureSuccessStatusCode();
+        (await IngestAsync(deviceToken, "Temperature", 41, DateTimeOffset.UtcNow.ToString("O"))).EnsureSuccessStatusCode();
+
+        for (var i = 0; i < 40; i++)
+        {
+            var alerts = await client.GetFromJsonAsync<JsonElement>("/api/alerts");
+            if (alerts.GetProperty("total").GetInt32() > 0) return;
+            await Task.Delay(500);
+        }
+        throw new TimeoutException("No alert was raised");
+    }
+
     private async Task<(HttpClient Client, string Token)> RegisterAsync()
     {
         var client = factory.CreateClient();
