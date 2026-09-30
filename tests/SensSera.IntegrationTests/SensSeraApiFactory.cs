@@ -32,6 +32,8 @@ public sealed class SensSeraApiFactory : WebApplicationFactory<Program>, IAsyncL
         builder.UseSetting("Jwt:Issuer", "SensSera");
         builder.UseSetting("Jwt:Audience", "SensSera");
         builder.UseSetting("Jobs:ThresholdEvaluationIntervalSeconds", "1");
+        // Every test registers its own org; the production 10/min auth limit would throttle the suite.
+        builder.UseSetting("RateLimiting:AuthPermitLimit", "1000");
     }
 }
 

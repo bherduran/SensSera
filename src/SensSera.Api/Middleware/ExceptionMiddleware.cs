@@ -24,7 +24,8 @@ public sealed class ExceptionMiddleware(RequestDelegate next, ILogger<ExceptionM
         var (status,title, detail) = ex switch
         {
             KeyNotFoundException => (StatusCodes.Status404NotFound, "Not Found", ex.Message),
-            UnauthorizedAccessException => (StatusCodes.Status403Forbidden, "Forbidden", ex.Message),
+            // Thrown only for failed authentication (bad credentials, missing/invalid refresh token).
+            UnauthorizedAccessException => (StatusCodes.Status401Unauthorized, "Unauthorized", ex.Message),
             ArgumentException => (StatusCodes.Status400BadRequest, "Bad Request", ex.Message),
             // Provider detail (may echo auth errors) stays in the log, never in the response.
             LlmUnavailableException => (StatusCodes.Status503ServiceUnavailable, "AI insights unavailable", "The AI provider is not configured or not reachable right now."),

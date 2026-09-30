@@ -60,14 +60,22 @@ public sealed class AuthService(
         return (new LoginResponse(accessToken, 900, new UserInfo(user.Id, user.Email, user.Role.ToString())), refreshToken);
     }
 
-    public async Task<RefreshResponse> RefreshAsync(string refreshToken, CancellationToken cancellationToken = default)
+    public async Task<(RefreshResponse Response, string RefreshToken)> RefreshAsync(string refreshToken, CancellationToken cancellationToken = default)
     {
         var hash = HashToken(refreshToken);
         var stored = await db.RefreshTokens
             .IgnoreQueryFilters()
             .Include(r => r.User)
-            .FirstOrDefaultAsync(r => r.TokenHash == hash && r.RevokedAt == null, cancellationToken)
+            .FirstOrDefaultAsync(r => r.TokenHash == hash, cancellationToken)
             ?? throw new UnauthorizedAccessException("Invalid or expired refresh token");
+
+        // A revoked token coming back means it was copied: either the thief or the real user is
+        // now holding a stale one. We can't tell which, so end every session for this user.
+        if (stored.RevokedAt is not null)
+        {
+            await RevokeAllForUserAsync(stored.UserId, cancellationToken);
+            throw new UnauthorizedAccessException("Invalid or expired refresh token");
+        }
 
         if (stored.ExpiresAt < timeProvider.GetUtcNow().UtcDateTime)
         {
@@ -78,8 +86,22 @@ public sealed class AuthService(
 
         // rotate: revoke old, issue new
         stored.RevokedAt = timeProvider.GetUtcNow().UtcDateTime;
-        var (accessToken, _) = await IssueTokensAsync(stored.User, stored.Id, cancellationToken);
-        return new RefreshResponse(accessToken, 900);
+        var (accessToken, newRefreshToken) = await IssueTokensAsync(stored.User, stored.Id, cancellationToken);
+        return (new RefreshResponse(accessToken, 900), newRefreshToken);
+    }
+
+    private async Task RevokeAllForUserAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var active = await db.RefreshTokens
+            .IgnoreQueryFilters()
+            .Where(r => r.UserId == userId && r.RevokedAt == null)
+            .ToListAsync(cancellationToken);
+
+        foreach (var token in active)
+            token.RevokedAt = now;
+
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     public async Task LogoutAsync(string refreshToken, CancellationToken cancellationToken = default)

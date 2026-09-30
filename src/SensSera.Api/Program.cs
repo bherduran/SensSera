@@ -97,6 +97,9 @@ builder.Services.AddAuthorization(options =>
 // Rate limiters: 100 req/min for ingest, 10 req/min for auth (brute force protection)
 builder.Services.AddRateLimiter(options =>
 {
+    // The middleware default is 503, which clients read as "server down" rather than "slow down".
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
     options.AddFixedWindowLimiter("ingest", o =>
     {
         o.PermitLimit = 100;
@@ -104,7 +107,7 @@ builder.Services.AddRateLimiter(options =>
     });
     options.AddFixedWindowLimiter("auth", o=>
     {
-        o.PermitLimit = 10;
+        o.PermitLimit = builder.Configuration.GetValue("RateLimiting:AuthPermitLimit", 10);
         o.Window = TimeSpan.FromMinutes(1);
     });
     // Insight "Ask" calls the LLM (slow + costs money) — cap per tenant, not per IP,

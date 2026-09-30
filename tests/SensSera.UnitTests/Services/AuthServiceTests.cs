@@ -71,7 +71,8 @@ public class AuthServiceTests : IDisposable
         _db.RefreshTokens.Add(oldToken);
         await _db.SaveChangesAsync();
 
-        await _sut.RefreshAsync(raw);
+        var (_, newRaw) = await _sut.RefreshAsync(raw);
+        newRaw.Should().NotBeNullOrWhiteSpace().And.NotBe(raw);
 
         var stored = await _db.RefreshTokens.AsNoTracking().ToListAsync();
         stored.Should().HaveCount(2);
