@@ -61,6 +61,33 @@ public sealed class ApiFlowTests(SensSeraApiFactory factory)
     }
 
     [Fact]
+    public async Task IngestBatch_WithOneInvalidReading_RejectsWholeBatch()
+    {
+        var (client, _) = await RegisterAsync();
+        var greenhouseId = await CreateGreenhouseAsync(client);
+        var (deviceId, deviceToken) = await CreateDeviceAsync(client, greenhouseId, "Humidity");
+        var now = DateTime.UtcNow;
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/ingest/batch")
+        {
+            Content = JsonContent.Create(new
+            {
+                readings = new[]
+                {
+                    new { metric = "Humidity", value = 50.0, recordedAt = now },
+                    new { metric = "Humidity", value = 500.0, recordedAt = now }, // out of 0-100 range
+                },
+            }),
+        };
+        request.Headers.Add("X-Device-Token", deviceToken);
+
+        (await factory.CreateClient().SendAsync(request)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var readings = await client.GetFromJsonAsync<JsonElement>($"/api/devices/{deviceId}/readings");
+        readings.GetProperty("readings").GetArrayLength().Should().Be(0);
+    }
+
+    [Fact]
     public async Task OtherTenant_GetsNotFound_AndEmptyList()
     {
         var (orgA, _) = await RegisterAsync();
