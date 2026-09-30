@@ -1,54 +1,75 @@
-# SensSera                                                                 
-                                                                                                                                                         
-  Multi-tenant smart greenhouse monitoring SaaS — sensor ingestion, time-series storage, threshold-based alerts, real-time dashboard.                    
-                                                                                                                                                         
-  > 🚧 **Work in progress.** Portfolio/learning project.                    
-                                                                                                                                                         
-  ## Stack                                                                                                                                               
+# SensSera
 
-  - **Backend:** ASP.NET Core (.NET 10), EF Core, PostgreSQL 18
-  - **Auth:** JWT access + httpOnly refresh cookie, BCrypt passwords, SHA-256 device tokens
-  - **Frontend:** Next.js + TypeScript + Tailwind (Stage 9+)
-  - **Realtime:** SignalR (Stage 10)
-  - **Simulator:** .NET console app that POSTs fake sensor readings
+[![CI](https://github.com/bherduran/SensSera/actions/workflows/ci.yml/badge.svg)](https://github.com/bherduran/SensSera/actions/workflows/ci.yml)
 
-  ## Architecture
+Multi-tenant smart greenhouse monitoring SaaS — sensor ingestion, time-series storage, threshold-based alerts, a real-time dashboard, and an LLM layer that explains alerts and answers questions over your own data.
 
-  Clean/layered, one-way references:
+> Portfolio/learning project. A device simulator stands in for real hardware.
 
-  ```
-  Api → Application + Infrastructure
-  Infrastructure → Application + Domain
-  Application → Domain
-  Domain → (nothing)
-  ```
+## Quick start (full stack in Docker)
 
-  Three main flows:
-  1. **Ingestion** — device → `POST /api/ingest` (X-Device-Token) → SensorReading → SignalR push
-  2. **Alerts** — background job compares readings to thresholds → Alert → SignalR push
-  3. **Query** — Next.js → REST + JWT → dashboard reads from rollup aggregates
+```bash
+cp .env.example .env          # optional: add a free Groq key for AI insights
+docker compose up -d --build
+```
 
-  ## Run locally
+Open <http://localhost:3000> and sign in with the seeded demo account **`admin@demo.com` / `Admin1234!`**.
 
-  ```bash
-  # 1. Start PostgreSQL
-  docker compose up -d
+Nothing else to set up: the API applies migrations on start, seeds the demo org, and the simulator provisions a demo greenhouse with six sensors and thresholds, then streams readings in alert mode — alerts start appearing within a minute. API docs (Scalar) are at <http://localhost:5010/scalar>.
 
-  # 2. Apply migrations
-  dotnet ef database update --project src/SensSera.Infrastructure --startup-project src/SensSera.Api
+AI insights (alert explanations, "Ask SensSera") need an LLM key in `.env` — [Groq](https://console.groq.com/keys) is free. Without one those two features answer `503` and the rest of the app works normally.
 
-  # 3. Run the API (Scalar UI at /scalar)
-  dotnet run --project src/SensSera.Api
+## Stack
 
-  # 4. (Optional) Run the simulator
-  dotnet run --project src/SensSera.Simulator
-  ```
+- **Backend:** ASP.NET Core (.NET 10), EF Core, PostgreSQL 18, SignalR, FluentValidation, Serilog
+- **Auth:** JWT access token (in memory) + rotating httpOnly refresh cookie with reuse detection, BCrypt passwords, SHA-256 device tokens
+- **Frontend:** Next.js 16, TypeScript, Tailwind v4, shadcn/ui, TanStack Query, Recharts; API types generated from the OpenAPI doc
+- **AI:** provider-agnostic `ILlmClient` — Anthropic (default `claude-opus-5`) or Groq; the model only picks whitelisted typed tools, never writes SQL
+- **Ops:** Docker Compose, GitHub Actions CI, Dependabot, Testcontainers
 
-  Requires a local `src/SensSera.Api/appsettings.Development.json` (gitignored) with a connection string and JWT signing key.
+## Architecture
 
-  ## Tests
+Clean/layered, one-way references:
 
-  ```bash
-  dotnet test SensSera.slnx
-  ```
+```
+Api → Application + Infrastructure
+Infrastructure → Application + Domain
+Application → Domain
+Domain → (nothing)
+```
 
+Three main flows:
+
+1. **Ingestion** — device → `POST /api/ingest` (`X-Device-Token`) → `SensorReading` → SignalR `ReadingReceived`
+2. **Alerts** — `ThresholdEvaluationJob` compares latest readings to thresholds → `Alert` (severity from overshoot) → SignalR `AlertRaised`
+3. **Query** — Next.js → REST + JWT → dashboard reads rollup aggregates, never raw scans
+
+Multi-tenancy is a shared schema with `OrganizationId` on every tenant-owned row, enforced by an EF Core global query filter fed from the JWT `org_id` claim. Cross-tenant access returns `404`, not `403`.
+
+## Local development
+
+```bash
+docker compose up -d db                        # just PostgreSQL
+dotnet ef database update --project src/SensSera.Infrastructure --startup-project src/SensSera.Api
+dotnet run --project src/SensSera.Api          # http://localhost:5010, Scalar at /scalar
+dotnet run --project src/SensSera.Simulator    # self-provisions demo devices
+cd senssera-web && npm install && npm run dev  # http://localhost:3000
+```
+
+The API needs a local `src/SensSera.Api/appsettings.Development.json` (gitignored) with `ConnectionStrings:DefaultConnection` and `Jwt:Key/Issuer/Audience`. For AI insights locally:
+
+```bash
+cd src/SensSera.Api
+dotnet user-secrets set "Llm:ApiKey" "<your key>"
+```
+
+and set `"Llm": { "Provider": "Groq", "Model": "llama-3.3-70b-versatile" }` in `appsettings.Development.json`.
+
+## Tests
+
+```bash
+dotnet test SensSera.slnx
+```
+
+- `tests/SensSera.UnitTests` — services on EF InMemory with a fake clock
+- `tests/SensSera.IntegrationTests` — the real API on a throwaway PostgreSQL container (Docker required), including the end-to-end path ingest → threshold breach → alert → SignalR event
