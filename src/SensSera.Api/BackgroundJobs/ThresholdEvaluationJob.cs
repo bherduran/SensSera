@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using SensSera.Application.Alerting;
 using SensSera.Application.DTOs;
 using SensSera.Application.Interfaces;
 using SensSera.Domain.Entities;
@@ -86,7 +87,7 @@ public sealed class ThresholdEvaluationJob(
                 ThresholdId = t.Id,
                 Metric = t.Metric,
                 TriggeredValue = latest.Value,
-                Severity = AlertSeverity.Warning,
+                Severity = AlertSeverityRule.For(latest.Value, t.MinValue, t.MaxValue),
                 Status = AlertStatus.Open,
                 TriggeredAt = now,
                 CreatedAt = now,
