@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
-import { Sprout, Cpu, ChevronRight, Bell } from "lucide-react";
 import { useDashboard, dashboardKey } from "@/hooks/use-dashboard";
 import { useTelemetry } from "@/hooks/use-telemetry";
+import { useThresholds } from "@/hooks/use-thresholds";
+import { bandLayout } from "@/lib/band";
 import { METRIC_META } from "@/lib/metrics";
 import type {
   DashboardSummary,
@@ -13,11 +14,11 @@ import type {
   MetricCurrent,
   Metric,
 } from "@/lib/types";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { LiveIndicator } from "@/components/app/live-indicator";
 import { AskPanel } from "@/components/insights/ask-panel";
+import { BandGauge } from "@/components/notebook/band-gauge";
+import { SpecimenHeader } from "@/components/notebook/specimen-header";
+import { LiveStamp } from "@/components/notebook/live-stamp";
 
 export default function DashboardPage() {
   const qc = useQueryClient();
@@ -48,58 +49,49 @@ export default function DashboardPage() {
     },
   });
 
+  const count = data?.greenhouses.length ?? 0;
+
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">
-            Live readings across all your greenhouses.
-          </p>
-        </div>
-        <LiveIndicator connected={connected} />
-      </div>
+    <div className="mx-auto max-w-6xl space-y-8">
+      <SpecimenHeader
+        code="Notebook"
+        subtitle={data ? `${count} greenhouse${count === 1 ? "" : "s"}` : undefined}
+        title="Dashboard"
+        aside={<LiveStamp connected={connected} />}
+      />
 
       <AskPanel />
 
       {isLoading && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-48 w-full rounded-xl" />
+        <div className="space-y-6">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <Skeleton key={i} className="h-72 w-full rounded-md" />
           ))}
         </div>
       )}
 
       {isError && (
-        <Card className="p-6 text-center text-sm text-muted-foreground">
-          Could not load the dashboard. Please refresh.
-        </Card>
+        <p className="font-serif text-lg italic text-alert-text">
+          The notebook couldn’t be loaded. Refresh the page to try again.
+        </p>
       )}
 
       {data && data.greenhouses.length === 0 && (
-        <Card className="flex flex-col items-center gap-3 p-10 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-            <Sprout className="h-6 w-6 text-primary" />
-          </div>
-          <div>
-            <p className="font-medium">Nothing to show yet</p>
-            <p className="text-sm text-muted-foreground">
-              Add a greenhouse and start ingesting readings to see live data here.
-            </p>
-          </div>
-          <Link
-            href="/greenhouses"
-            className="text-sm font-medium text-primary hover:underline"
-          >
-            Go to greenhouses
+        <div className="rounded-md border bg-card p-10 text-center paper-shadow">
+          <p className="font-serif text-2xl">Nothing recorded yet.</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Add a greenhouse and start sending readings; they will appear here live.
+          </p>
+          <Link href="/greenhouses" className="mt-4 inline-block font-serif italic underline underline-offset-4">
+            Go to greenhouses →
           </Link>
-        </Card>
+        </div>
       )}
 
       {data && data.greenhouses.length > 0 && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {data.greenhouses.map((g) => (
-            <GreenhouseCard key={g.greenhouseId} greenhouse={g} />
+        <div className="space-y-6">
+          {data.greenhouses.map((g, i) => (
+            <GreenhouseSheet key={g.greenhouseId} greenhouse={g} index={i} />
           ))}
         </div>
       )}
@@ -107,75 +99,65 @@ export default function DashboardPage() {
   );
 }
 
-function GreenhouseCard({ greenhouse }: { greenhouse: GreenhouseSummary }) {
-  return (
-    <Card className="group flex flex-col gap-0 overflow-hidden py-0 transition-colors hover:border-primary/40">
-      <CardHeader className="flex-row items-center gap-3 space-y-0 p-5">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-          <Sprout className="h-5 w-5 text-primary" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate font-semibold">{greenhouse.name}</p>
-          <p className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Cpu className="h-3 w-3" />
-            {greenhouse.deviceCount} device{greenhouse.deviceCount === 1 ? "" : "s"}
-          </p>
-        </div>
-        {greenhouse.activeAlerts > 0 && (
-          <Badge variant="destructive" className="gap-1">
-            <Bell className="h-3 w-3" />
-            {greenhouse.activeAlerts}
-          </Badge>
-        )}
-      </CardHeader>
-
-      <CardContent className="flex-1 px-5 pb-4">
-        {greenhouse.metrics.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No readings yet.</p>
-        ) : (
-          <div className="grid grid-cols-2 gap-2">
-            {greenhouse.metrics.map((m) => (
-              <MetricChip key={m.metric} metric={m} />
-            ))}
-          </div>
-        )}
-      </CardContent>
-
-      <div className="border-t bg-muted/30 px-5 py-2.5">
-        <Link
-          href={`/greenhouses/${greenhouse.greenhouseId}`}
-          className="inline-flex items-center text-sm font-medium text-primary hover:underline"
-        >
-          View greenhouse
-          <ChevronRight className="ml-0.5 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-        </Link>
-      </div>
-    </Card>
+function GreenhouseSheet({ greenhouse, index }: { greenhouse: GreenhouseSummary; index: number }) {
+  const { data: thresholds } = useThresholds(greenhouse.greenhouseId);
+  const bands = new Map(
+    (thresholds ?? []).filter((t) => t.isEnabled).map((t) => [t.metric, t] as const),
   );
-}
 
-function MetricChip({ metric }: { metric: MetricCurrent }) {
-  const meta = METRIC_META[metric.metric as Metric];
-  const Icon = meta?.icon;
+  // Out-of-band readings first, so the sheet leads with what needs attention.
+  const metrics = greenhouse.metrics
+    .map((m) => {
+      const t = bands.get(m.metric as Metric);
+      const min = t?.minValue ?? null;
+      const max = t?.maxValue ?? null;
+      const status = bandLayout({ value: m.current, min, max, metric: m.metric as Metric }).status;
+      return { ...m, min, max, out: status === "over" || status === "under" };
+    })
+    .sort((a, b) => Number(b.out) - Number(a.out));
+
   return (
-    <div className="flex items-center gap-2 rounded-lg border bg-card p-2.5">
-      {Icon && (
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10">
-          <Icon className="h-4 w-4 text-primary" />
+    <article className="rounded-md border bg-card p-5 paper-shadow sm:p-6">
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-dashed pb-3">
+        <div>
+          <p className="label-caps">
+            GH-{String(index + 1).padStart(2, "0")} · {greenhouse.deviceCount} device
+            {greenhouse.deviceCount === 1 ? "" : "s"}
+          </p>
+          <h2 className="mt-1 font-serif text-[28px] leading-none">{greenhouse.name}</h2>
+        </div>
+        {greenhouse.activeAlerts > 0 ? (
+          <Link
+            href="/alerts"
+            className="inline-flex items-center gap-1.5 font-mono text-xs text-alert-text underline-offset-4 hover:underline"
+          >
+            <span className="size-2 rounded-full bg-alert" />
+            {greenhouse.activeAlerts} open alert{greenhouse.activeAlerts === 1 ? "" : "s"}
+          </Link>
+        ) : (
+          <span className="font-mono text-xs text-muted-foreground">no open alerts</span>
+        )}
+      </div>
+
+      {metrics.length === 0 ? (
+        <p className="py-6 font-serif italic text-muted-foreground">No readings recorded yet.</p>
+      ) : (
+        <div className="grid gap-x-8 gap-y-6 pt-5 sm:grid-cols-2 lg:grid-cols-3">
+          {metrics.map((m) => (
+            <BandGauge key={m.metric} size="sm" metric={m.metric as Metric} value={m.current} min={m.min} max={m.max} />
+          ))}
         </div>
       )}
-      <div className="min-w-0">
-        <p className="truncate text-xs text-muted-foreground">
-          {meta?.label ?? metric.metric}
-        </p>
-        <p className="font-semibold tabular-nums">
-          {metric.current}
-          <span className="ml-0.5 text-xs font-normal text-muted-foreground">
-            {meta?.unit}
-          </span>
-        </p>
+
+      <div className="mt-5 flex justify-end">
+        <Link
+          href={`/greenhouses/${greenhouse.greenhouseId}`}
+          className="font-serif text-[15px] italic underline-offset-4 hover:underline"
+        >
+          Open this notebook →
+        </Link>
       </div>
-    </div>
+    </article>
   );
 }
 

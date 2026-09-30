@@ -183,7 +183,7 @@ public sealed class InsightService(
     [
         new("get_active_alerts",
             "List currently open alerts, optionally filtered to one greenhouse by name.",
-            "{\"type\":\"object\",\"properties\":{\"greenhouse\":{\"type\":\"string\",\"description\":\"Greenhouse name (optional)\"}}}"),
+            "{\"type\":\"object\",\"properties\":{\"greenhouse\":{\"type\":[\"string\",\"null\"],\"description\":\"Greenhouse name (optional)\"}}}"),
         new("get_latest_readings",
             "Get the most recent readings for a metric in a greenhouse.",
             "{\"type\":\"object\",\"properties\":{\"greenhouse\":{\"type\":\"string\"},\"metric\":{\"type\":\"string\",\"enum\":[\"Temperature\",\"Humidity\",\"Co2\",\"SoilMoisture\",\"Light\",\"Pressure\"]}},\"required\":[\"greenhouse\",\"metric\"]}"),

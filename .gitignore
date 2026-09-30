@@ -519,3 +519,6 @@ audit-2026-06-14.md
 
 # Simulator real config (template lives in appsettings.example.json)                                                                                   
 src/SensSera.Simulator/appsettings.json
+
+# Brainstorm companion mockups
+.superpowers/

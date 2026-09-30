@@ -1,16 +1,22 @@
 import type { Metadata } from "next";
-import { Fira_Sans, Fira_Code } from "next/font/google";
+import { Newsreader, Schibsted_Grotesk, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 
-const firaSans = Fira_Sans({
-  variable: "--font-fira-sans",
+// Notebook type system: serif for headings and AI notes, grotesk for UI, mono for every number.
+const newsreader = Newsreader({
+  variable: "--font-newsreader",
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
+  style: ["normal", "italic"],
 });
 
-const firaCode = Fira_Code({
-  variable: "--font-fira-code",
+const schibsted = Schibsted_Grotesk({
+  variable: "--font-schibsted",
+  subsets: ["latin"],
+});
+
+const jetbrains = JetBrains_Mono({
+  variable: "--font-jetbrains",
   subsets: ["latin"],
 });
 
@@ -29,7 +35,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${firaSans.variable} ${firaCode.variable} h-full antialiased`}
+      className={`${newsreader.variable} ${schibsted.variable} ${jetbrains.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <Providers>{children}</Providers>

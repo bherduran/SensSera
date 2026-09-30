@@ -51,15 +51,15 @@ export function DeviceTokenDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm">
-          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+        <div className="flex items-start gap-2 border-l-2 border-alert bg-alert/[0.07] px-3 py-2.5 text-sm">
+          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-alert-text" />
           <span className="text-foreground/80">
             Paste it into your device / simulator config. If it&apos;s lost, rotate
             the token to issue a new one.
           </span>
         </div>
 
-        <div className="flex items-center gap-2 rounded-md border bg-muted/40 p-3">
+        <div className="flex items-center gap-2 rounded-[2px] border border-dashed bg-muted/50 p-3">
           <code className="flex-1 break-all font-mono text-xs">{token}</code>
           <Button
             variant="outline"
@@ -68,7 +68,7 @@ export function DeviceTokenDialog({
             aria-label="Copy token"
           >
             {copied ? (
-              <Check className="h-4 w-4 text-success" />
+              <Check className="h-4 w-4" />
             ) : (
               <Copy className="h-4 w-4" />
             )}

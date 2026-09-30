@@ -1,7 +1,7 @@
 "use client";
 
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, BellRing } from "lucide-react";
+import { Plus, Pencil, Trash2 } from "lucide-react";
 import { useThresholds, useDeleteThreshold } from "@/hooks/use-thresholds";
 import { METRIC_META } from "@/lib/metrics";
 import type { Metric, Threshold } from "@/lib/types";
@@ -36,8 +36,11 @@ export function ThresholdsSection({ greenhouseId }: { greenhouseId: string }) {
 
   return (
     <section className="space-y-3">
-      <div className="flex items-center justify-between gap-4">
-        <h2 className="text-lg font-semibold">Alert thresholds</h2>
+      <div className="flex items-end justify-between gap-4 border-b border-dashed pt-4 pb-2">
+        <div>
+          <p className="label-caps">Safe bands</p>
+          <h2 className="font-serif text-2xl leading-tight">Alert thresholds</h2>
+        </div>
         <ThresholdFormDialog
           greenhouseId={greenhouseId}
           trigger={
@@ -49,22 +52,16 @@ export function ThresholdsSection({ greenhouseId }: { greenhouseId: string }) {
         />
       </div>
 
-      {isLoading && <Skeleton className="h-32 w-full rounded-xl" />}
+      {isLoading && <Skeleton className="h-32 w-full rounded-md" />}
 
       {isError && (
-        <Card className="p-6 text-center text-sm text-muted-foreground">
-          Could not load thresholds.
-        </Card>
+        <p className="font-serif italic text-alert-text">Thresholds couldn’t be loaded.</p>
       )}
 
       {data && data.length === 0 && (
-        <Card className="flex flex-col items-center gap-2 p-8 text-center">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-            <BellRing className="h-5 w-5 text-primary" />
-          </div>
-          <p className="text-sm text-muted-foreground">
-            No thresholds yet — add one to start getting alerts.
-          </p>
+        <Card className="items-center p-8 text-center">
+          <p className="font-serif text-xl">No safe bands yet.</p>
+          <p className="text-sm text-muted-foreground">Add a threshold to start getting alerts.</p>
         </Card>
       )}
 
@@ -119,7 +116,7 @@ function ThresholdRow({
           {meta?.label ?? threshold.metric}
         </span>
       </TableCell>
-      <TableCell className="tabular-nums text-muted-foreground">
+      <TableCell className="font-mono text-sm">
         {fmt(threshold.minValue)} – {fmt(threshold.maxValue)}
         {meta?.unit ? <span className="ml-1">{meta.unit}</span> : null}
       </TableCell>

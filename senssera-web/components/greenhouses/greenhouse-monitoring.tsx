@@ -3,16 +3,15 @@
 import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { AlertTriangle, Activity } from "lucide-react";
 import { useGreenhouseDetail } from "@/hooks/use-dashboard";
 import { useGreenhouseReadings } from "@/hooks/use-readings";
 import { useTelemetry } from "@/hooks/use-telemetry";
+import { useThresholds } from "@/hooks/use-thresholds";
 import { METRIC_META } from "@/lib/metrics";
 import type { Alert, Metric, MetricSummary } from "@/lib/types";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { MetricChart, type ChartPoint } from "@/components/charts/metric-chart";
+import { MetricChart, type ChartBand, type ChartPoint } from "@/components/charts/metric-chart";
+import { BandGauge } from "@/components/notebook/band-gauge";
 
 const round2 = (v: number) => Math.round(v * 100) / 100;
 const LIVE_CAP = 120;
@@ -20,6 +19,12 @@ const LIVE_CAP = 120;
 export function GreenhouseMonitoring({ greenhouseId }: { greenhouseId: string }) {
   const qc = useQueryClient();
   const { data, isLoading, isError } = useGreenhouseDetail(greenhouseId);
+  const { data: thresholds } = useThresholds(greenhouseId);
+  const bands = new Map<string, ChartBand>(
+    (thresholds ?? [])
+      .filter((t) => t.isEnabled)
+      .map((t) => [t.metric, { min: t.minValue ?? null, max: t.maxValue ?? null }]),
+  );
   const [liveByMetric, setLiveByMetric] = useState<
     Record<string, ChartPoint[]>
   >({});
@@ -48,9 +53,9 @@ export function GreenhouseMonitoring({ greenhouseId }: { greenhouseId: string })
 
   if (isLoading) {
     return (
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-5 md:grid-cols-2">
         {Array.from({ length: 2 }).map((_, i) => (
-          <Skeleton key={i} className="h-64 w-full rounded-xl" />
+          <Skeleton key={i} className="h-72 w-full rounded-md" />
         ))}
       </div>
     );
@@ -58,37 +63,33 @@ export function GreenhouseMonitoring({ greenhouseId }: { greenhouseId: string })
 
   if (isError || !data) {
     return (
-      <Card className="p-6 text-center text-sm text-muted-foreground">
-        Could not load monitoring data. Please refresh.
-      </Card>
+      <p className="font-serif text-lg italic text-alert-text">
+        Monitoring data couldn’t be loaded. Refresh the page to try again.
+      </p>
     );
   }
 
   if (data.metrics.length === 0) {
     return (
-      <Card className="flex flex-col items-center gap-3 p-10 text-center">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-          <Activity className="h-6 w-6 text-primary" />
-        </div>
-        <div>
-          <p className="font-medium">No readings yet</p>
-          <p className="text-sm text-muted-foreground">
-            Once devices start ingesting, live charts appear here.
-          </p>
-        </div>
-      </Card>
+      <div className="rounded-md border bg-card p-10 text-center paper-shadow">
+        <p className="font-serif text-2xl">No readings yet.</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Once devices start sending data, live charts appear here.
+        </p>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {data.activeAlerts.length > 0 && <AlertStrip alerts={data.activeAlerts} />}
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-5 md:grid-cols-2">
         {data.metrics.map((summary) => (
           <MetricCard
             key={summary.metric}
             greenhouseId={greenhouseId}
             summary={summary}
+            band={bands.get(summary.metric)}
             live={liveByMetric[summary.metric] ?? []}
           />
         ))}
@@ -100,15 +101,16 @@ export function GreenhouseMonitoring({ greenhouseId }: { greenhouseId: string })
 function MetricCard({
   greenhouseId,
   summary,
+  band,
   live,
 }: {
   greenhouseId: string;
   summary: MetricSummary;
+  band?: ChartBand;
   live: ChartPoint[];
 }) {
   const metric = summary.metric as Metric;
   const meta = METRIC_META[metric];
-  const Icon = meta?.icon;
   const { data } = useGreenhouseReadings(greenhouseId, metric);
 
   const series = useMemo<ChartPoint[]>(() => {
@@ -123,86 +125,56 @@ function MetricCard({
   const current = live.length > 0 ? live[live.length - 1].value : summary.current;
 
   return (
-    <Card className="flex flex-col gap-3 p-5">
-      <div className="flex items-center gap-2">
-        {Icon && (
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10">
-            <Icon className="h-4 w-4 text-primary" />
-          </div>
-        )}
-        <div className="min-w-0">
-          <p className="text-sm font-medium">{meta?.label ?? metric}</p>
-          <p className="text-xs text-muted-foreground">Last 24 hours</p>
-        </div>
-        <div className="ml-auto text-right">
-          <p className="text-2xl font-bold tabular-nums leading-none">
-            {current}
-            <span className="ml-0.5 text-sm font-normal text-muted-foreground">
-              {meta?.unit}
-            </span>
-          </p>
-        </div>
+    <section className="flex flex-col gap-4 rounded-md border bg-card p-5 paper-shadow">
+      <BandGauge metric={metric} value={current} min={band?.min ?? null} max={band?.max ?? null} />
+      <div>
+        <p className="label-caps mb-1">Last 24 hours</p>
+        <MetricChart data={series} unit={meta?.unit} band={band} />
       </div>
-
-      <MetricChart data={series} unit={meta?.unit} />
-
-      <div className="grid grid-cols-3 gap-2 border-t pt-3 text-center">
+      <dl className="grid grid-cols-3 gap-2 border-t border-dashed pt-3">
         <Stat label="Min" value={summary.min24h} unit={meta?.unit} />
         <Stat label="Avg" value={summary.avg24h} unit={meta?.unit} />
         <Stat label="Max" value={summary.max24h} unit={meta?.unit} />
-      </div>
-    </Card>
+      </dl>
+    </section>
   );
 }
 
-function Stat({
-  label,
-  value,
-  unit,
-}: {
-  label: string;
-  value: number;
-  unit?: string;
-}) {
+const statFmt = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
+
+function Stat({ label, value, unit }: { label: string; value: number; unit?: string }) {
   return (
     <div>
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="font-semibold tabular-nums">
-        {value}
-        <span className="ml-0.5 text-xs font-normal text-muted-foreground">
-          {unit}
-        </span>
-      </p>
+      <dt className="label-caps">{label}</dt>
+      <dd className="mt-0.5 font-mono text-sm">
+        {statFmt.format(value)}
+        <span className="ml-1 text-muted-foreground">{unit}</span>
+      </dd>
     </div>
   );
 }
 
 function AlertStrip({ alerts }: { alerts: Alert[] }) {
   return (
-    <Card className="border-destructive/30 bg-destructive/5 p-4">
-      <div className="mb-2 flex items-center gap-2 text-sm font-medium text-destructive">
-        <AlertTriangle className="h-4 w-4" />
-        {alerts.length} active alert{alerts.length === 1 ? "" : "s"}
-      </div>
-      <div className="flex flex-wrap gap-2">
+    <section className="border-l-2 border-alert bg-alert/[0.07] px-4 py-3">
+      <p className="label-caps text-alert-text">
+        {alerts.length} open alert{alerts.length === 1 ? "" : "s"}
+      </p>
+      <ul className="mt-1.5 flex flex-wrap gap-x-6 gap-y-1 font-mono text-sm">
         {alerts.map((a) => {
           const meta = METRIC_META[a.metric];
           return (
-            <Badge
-              key={a.id}
-              variant="outline"
-              className="gap-1 border-destructive/30 bg-background font-normal"
-            >
-              {meta?.label ?? a.metric}
-              <span className="tabular-nums">
-                {a.triggeredValue}
-                {meta?.unit}
-              </span>
+            <li key={a.id} className="flex items-center gap-2">
+              <span
+                className={a.severity === "critical" ? "size-2 rounded-full bg-alert" : "size-2 rounded-full border border-alert"}
+                aria-label={a.severity}
+              />
+              {meta?.label ?? a.metric} {statFmt.format(a.triggeredValue)} {meta?.unit}
               <span className="text-muted-foreground">· {a.severity}</span>
-            </Badge>
+            </li>
           );
         })}
-      </div>
-    </Card>
+      </ul>
+    </section>
   );
 }

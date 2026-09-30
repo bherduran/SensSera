@@ -1,11 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Sparkles, Loader2, SendHorizontal } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { ArrowRight } from "lucide-react";
 import { insightErrorMessage, useAskInsights } from "@/hooks/use-insights";
+import { FieldNote } from "@/components/notebook/field-note";
 
 const SUGGESTIONS = [
   "Which greenhouse was hottest in the last 24 hours?",
@@ -13,6 +11,7 @@ const SUGGESTIONS = [
   "What was the average humidity today?",
 ];
 
+/** A question line at the top of the notebook; answers come back as field notes. */
 export function AskPanel() {
   const [question, setQuestion] = useState("");
   const ask = useAskInsights();
@@ -25,83 +24,67 @@ export function AskPanel() {
   }
 
   return (
-    <Card className="space-y-4 p-5">
-      <div className="flex items-center gap-2">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-          <Sparkles className="h-4 w-4 text-primary" />
-        </div>
-        <div>
-          <p className="font-semibold leading-tight">Ask SensSera</p>
-          <p className="text-xs text-muted-foreground">
-            Natural-language questions over your own greenhouse data.
-          </p>
-        </div>
-      </div>
+    <section className="rounded-md border bg-card px-5 pt-4 pb-5 paper-shadow">
+      <p className="label-caps">Ask the notebook</p>
 
       <form
-        className="flex gap-2"
+        className="mt-2 flex items-end gap-3 border-b border-foreground/70 focus-within:border-foreground"
         onSubmit={(e) => {
           e.preventDefault();
           submit(question);
         }}
       >
-        <Input
+        <input
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
-          placeholder="e.g. Which greenhouse was hottest today?"
+          placeholder="Which greenhouse ran hottest today?"
           maxLength={500}
           aria-label="Ask a question about your greenhouses"
+          className="h-11 min-w-0 flex-1 bg-transparent font-serif text-xl outline-none placeholder:text-muted-foreground/70 placeholder:italic"
         />
-        <Button
+        <button
           type="submit"
           disabled={ask.isPending || !question.trim()}
           aria-label="Ask"
+          className="mb-2 inline-flex items-center gap-1 font-mono text-xs uppercase tracking-wider disabled:opacity-40"
         >
-          {ask.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <SendHorizontal className="h-4 w-4" />
-          )}
-        </Button>
+          Ask <ArrowRight className="size-3.5" />
+        </button>
       </form>
 
-      {!ask.data && !ask.isPending && (
-        <div className="flex flex-wrap gap-1.5">
+      {!ask.data && !ask.isPending && !ask.isError && (
+        <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5">
           {SUGGESTIONS.map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => submit(s)}
-              className="cursor-pointer rounded-full border px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
-            >
-              {s}
-            </button>
+            <li key={s}>
+              <button
+                type="button"
+                onClick={() => submit(s)}
+                className="font-mono text-xs text-muted-foreground underline decoration-dotted underline-offset-4 hover:text-foreground"
+              >
+                {s}
+              </button>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
 
-      {ask.isPending && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" /> Thinking&hellip;
-        </div>
-      )}
+      {ask.isPending && <FieldNote pending className="mt-4" />}
 
       {ask.isError && (
-        <p className="text-sm text-destructive">
+        <p className="mt-3 text-sm text-alert-text">
           {insightErrorMessage(ask.error, "Couldn’t answer that. Please try again.")}
         </p>
       )}
 
       {ask.data && !ask.isPending && (
-        <div className="space-y-2 rounded-lg border bg-muted/30 p-3">
-          <p className="text-sm leading-relaxed">{ask.data.answer}</p>
-          <p className="text-[11px] text-muted-foreground">
+        <div className="mt-4">
+          <FieldNote>{ask.data.answer}</FieldNote>
+          <p className="mt-2 font-mono text-[11px] text-muted-foreground">
             {ask.data.model}
-            {ask.data.usedFunctions.length > 0 &&
-              ` · used ${ask.data.usedFunctions.join(", ")}`}
+            {ask.data.usedFunctions.length > 0 && ` · used ${ask.data.usedFunctions.join(", ")}`}
           </p>
         </div>
       )}
-    </Card>
+    </section>
   );
 }

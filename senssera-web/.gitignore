@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Higgsfield hero candidates (generated, not shipped)
+scripts/hero/candidates/

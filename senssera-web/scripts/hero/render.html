@@ -1,0 +1,313 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>SensSera hero — clay study</title>
+  <style>html,body{margin:0;background:transparent}canvas{display:block}</style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "/node_modules/three/build/three.module.js",
+        "three/addons/": "/node_modules/three/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+<script type="module">
+import * as THREE from "three";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { GTAOPass } from "three/addons/postprocessing/GTAOPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+
+// Matte-clay greenhouse study. One scene, two lighting setups (?theme=light|dark): the light and
+// night heroes are the same object photographed under different light.
+const params = new URLSearchParams(location.search);
+const theme = params.get("theme") === "dark" ? "dark" : "light";
+const W = Number(params.get("w") ?? 1600);
+const H = Number(params.get("h") ?? 1200);
+const SS = 2; // supersampling factor; the capture script downsizes the result
+
+const T = {
+  light: { bg: "#F3EFE7", plinth: "#D8C7AA", clay: "#E9DEC9", frame: "#E6D8BF", bed: "#BD7355", soil: "#6F4F3D",
+           leaf: "#7F9669", leafLight: "#9AAE85", pot: "#B9694B", pebble: "#CDBB9D",
+           hemi: 0.8, key: 2.3, shadow: 0.26, env: 0.45, exposure: 0.96, ao: 1.0 },
+  dark:  { bg: "#171512", plinth: "#6F655A", clay: "#D8CEBE", frame: "#CFC3B0", bed: "#AE6F53", soil: "#5E4535",
+           leaf: "#7D926A", leafLight: "#95A882", pot: "#C0704F", pebble: "#8A7F72",
+           hemi: 0.28, key: 1.5, shadow: 0.5, env: 0.16, exposure: 1.0, ao: 1.0 },
+}[theme];
+
+// ---------------------------------------------------------------- renderer + post
+// Transparent canvas: the post chain tone-maps every pixel, so a painted background would drift
+// grey. The capture script composites the render onto the exact theme colour instead.
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, alpha: true, premultipliedAlpha: false });
+renderer.setClearColor(0x000000, 0);
+renderer.setPixelRatio(SS);
+renderer.setSize(W, H);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = T.exposure;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = T.env;
+
+const camera = new THREE.PerspectiveCamera(24, W / H, 0.1, 100);
+camera.position.set(8.4, 6.5, 10.1);
+camera.lookAt(0.1, 0.95, 0.35);
+
+// ---------------------------------------------------------------- lights
+scene.add(new THREE.HemisphereLight("#fffaf2", theme === "light" ? "#d6c9b3" : "#2a2520", T.hemi));
+const key = new THREE.DirectionalLight("#fff3e2", T.key);
+key.position.set(-5.5, 8.5, 5.5);
+key.castShadow = true;
+key.shadow.mapSize.set(4096, 4096);
+key.shadow.radius = 8;
+key.shadow.blurSamples = 25;
+key.shadow.bias = -0.0003;
+key.shadow.normalBias = 0.02;
+Object.assign(key.shadow.camera, { left: -5, right: 5, top: 5, bottom: -5, near: 1, far: 25 });
+scene.add(key);
+const fill = new THREE.DirectionalLight(theme === "light" ? "#f2ece2" : "#6d7a8a", theme === "light" ? 0.6 : 0.35);
+fill.position.set(6, 3, 4);
+scene.add(fill);
+if (theme === "dark") {
+  // Night: the greenhouse is lit from inside; a warm lamp spills through the glass.
+  const lamp = new THREE.PointLight("#ffb07a", 9, 5.5, 1.6);
+  lamp.position.set(0, 1.55, 0);
+  lamp.castShadow = true;
+  lamp.shadow.mapSize.set(1024, 1024);
+  lamp.shadow.radius = 6;
+  scene.add(lamp);
+  const rim = new THREE.DirectionalLight("#e9a58a", 1.1);
+  rim.position.set(5, 4, -6);
+  scene.add(rim);
+}
+
+// ---------------------------------------------------------------- clay surface texture
+// Low-amplitude value noise as a bump + roughness map: reads as hand-pressed clay, not plastic.
+function noiseTexture(size = 512, scale = 48, seed = 7) {
+  const c = document.createElement("canvas");
+  c.width = c.height = size;
+  const g = c.getContext("2d");
+  const img = g.createImageData(size, size);
+  let s = seed;
+  const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+  const grid = Array.from({ length: scale + 1 }, () => Array.from({ length: scale + 1 }, rnd));
+  const lerp = (a, b, t) => a + (b - a) * (t * t * (3 - 2 * t));
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const gx = (x / size) * scale, gy = (y / size) * scale;
+      const x0 = Math.floor(gx), y0 = Math.floor(gy);
+      const v = lerp(lerp(grid[y0][x0], grid[y0][x0 + 1], gx - x0), lerp(grid[y0 + 1][x0], grid[y0 + 1][x0 + 1], gx - x0), gy - y0);
+      const fine = rnd() * 0.18;
+      const n = Math.round((v * 0.82 + fine) * 255);
+      const i = (y * size + x) * 4;
+      img.data[i] = img.data[i + 1] = img.data[i + 2] = n;
+      img.data[i + 3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
+}
+const bump = noiseTexture();
+bump.repeat.set(3, 3);
+
+const clay = (color, roughness = 0.86, bumpScale = 1.4) =>
+  new THREE.MeshStandardMaterial({ color, roughness, metalness: 0, bumpMap: bump, bumpScale, roughnessMap: bump });
+
+function add(geo, mat, x, y, z, opts = {}) {
+  const m = new THREE.Mesh(geo, mat);
+  m.position.set(x, y, z);
+  if (opts.rot) m.rotation.set(...opts.rot);
+  if (opts.scale) m.scale.set(...opts.scale);
+  m.castShadow = opts.cast ?? true;
+  m.receiveShadow = true;
+  (opts.parent ?? scene).add(m);
+  return m;
+}
+
+// ---------------------------------------------------------------- ground + plinth
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.ShadowMaterial({ opacity: T.shadow }));
+floor.rotation.x = -Math.PI / 2;
+floor.receiveShadow = true;
+scene.add(floor);
+
+// Soft organic island: a rounded rectangle extruded with a deep bevel, like a pinched clay slab.
+function roundedRect(w, d, r) {
+  const s = new THREE.Shape();
+  s.moveTo(-w / 2 + r, -d / 2);
+  s.lineTo(w / 2 - r, -d / 2);
+  s.quadraticCurveTo(w / 2, -d / 2, w / 2, -d / 2 + r);
+  s.lineTo(w / 2, d / 2 - r);
+  s.quadraticCurveTo(w / 2, d / 2, w / 2 - r, d / 2);
+  s.lineTo(-w / 2 + r, d / 2);
+  s.quadraticCurveTo(-w / 2, d / 2, -w / 2, d / 2 - r);
+  s.lineTo(-w / 2, -d / 2 + r);
+  s.quadraticCurveTo(-w / 2, -d / 2, -w / 2 + r, -d / 2);
+  return s;
+}
+const plinthGeo = new THREE.ExtrudeGeometry(roundedRect(5.6, 4.3, 1.1), {
+  depth: 0.1, bevelEnabled: true, bevelThickness: 0.12, bevelSize: 0.14, bevelSegments: 10, curveSegments: 40,
+});
+add(plinthGeo, clay(T.plinth, 0.95, 1.8), 0.25, 0.22, 0.35, { rot: [-Math.PI / 2, 0, 0] });
+const plinthTop = 0.44;
+
+// pebbles
+const pebbleMat = clay(T.pebble, 0.9, 1.2);
+[[-2.2, 1.9, 0.11], [-1.95, 2.15, 0.07], [2.4, -1.2, 0.09], [2.65, -0.95, 0.06], [-2.35, -1.3, 0.08], [1.1, 2.25, 0.07], [1.35, 2.1, 0.05]]
+  .forEach(([x, z, r]) => add(new THREE.SphereGeometry(r, 18, 12), pebbleMat, x, plinthTop + r * 0.45, z, { scale: [1.2, 0.7, 1] }));
+
+// ---------------------------------------------------------------- greenhouse
+const gh = new THREE.Group();
+gh.position.y = plinthTop;
+scene.add(gh);
+const L = 3.4, D = 2.3, wallH = 1.3, roofRise = 0.9, post = 0.11;
+const frameMat = clay(T.frame, 0.8, 1.0);
+
+add(new RoundedBoxGeometry(L + 0.3, 0.14, D + 0.3, 4, 0.06), clay(T.clay), 0, 0.07, 0, { parent: gh });
+const baseTop = 0.14;
+const xs = [-L / 2, -L / 6, L / 6, L / 2];
+
+for (const x of xs) for (const z of [-D / 2, D / 2])
+  add(new RoundedBoxGeometry(post, wallH, post, 3, 0.045), frameMat, x, baseTop + wallH / 2, z, { parent: gh });
+// side end posts at mid-depth
+for (const x of [-L / 2, L / 2])
+  add(new RoundedBoxGeometry(post, wallH, post, 3, 0.045), frameMat, x, baseTop + wallH / 2, 0, { parent: gh });
+// eaves, sill rails and a mid rail on the long sides
+for (const z of [-D / 2, D / 2]) {
+  add(new RoundedBoxGeometry(L + post, post, post, 3, 0.045), frameMat, 0, baseTop + wallH, z, { parent: gh });
+  add(new RoundedBoxGeometry(L + post, post * 0.8, post * 0.8, 3, 0.035), frameMat, 0, baseTop + 0.42, z, { parent: gh });
+}
+for (const x of [-L / 2, L / 2]) {
+  add(new RoundedBoxGeometry(post, post, D, 3, 0.045), frameMat, x, baseTop + wallH, 0, { parent: gh });
+  add(new RoundedBoxGeometry(post * 0.8, post * 0.8, D, 3, 0.035), frameMat, x, baseTop + 0.42, 0, { parent: gh });
+}
+const ridgeY = baseTop + wallH + roofRise;
+add(new RoundedBoxGeometry(L + 0.24, post * 1.3, post * 1.3, 3, 0.055), frameMat, 0, ridgeY, 0, { parent: gh });
+const rafterLen = Math.hypot(D / 2, roofRise);
+const pitch = Math.atan2(roofRise, D / 2);
+for (const x of xs) for (const s of [-1, 1])
+  add(new RoundedBoxGeometry(post, post, rafterLen + 0.05, 3, 0.045), frameMat,
+    x, baseTop + wallH + roofRise / 2, s * D / 4, { parent: gh, rot: [s * pitch, 0, 0] });
+
+// door on the front gable end (x = +L/2)
+const door = new THREE.Group();
+door.position.set(L / 2 + 0.01, baseTop, 0);
+gh.add(door);
+for (const z of [-0.36, 0.36]) add(new RoundedBoxGeometry(0.08, 1.12, 0.08, 3, 0.035), frameMat, 0, 0.56, z, { parent: door });
+add(new RoundedBoxGeometry(0.08, 0.08, 0.8, 3, 0.035), frameMat, 0, 1.12, 0, { parent: door });
+add(new THREE.SphereGeometry(0.045, 16, 12), clay(T.pot, 0.6, 0.5), 0.06, 0.6, 0.26, { parent: door });
+
+// glass
+const glass = new THREE.MeshPhysicalMaterial({
+  color: theme === "light" ? "#f6f8f2" : "#e7d9c5", roughness: 0.12, transmission: 0.95, thickness: 0.04,
+  ior: 1.3, transparent: true, opacity: theme === "light" ? 0.5 : 0.42, metalness: 0,
+  clearcoat: 0.6, clearcoatRoughness: 0.2,
+});
+const pane = { parent: gh, cast: false };
+for (const z of [-D / 2, D / 2]) add(new THREE.BoxGeometry(L, wallH, 0.015), glass, 0, baseTop + wallH / 2, z, pane);
+for (const x of [-L / 2, L / 2]) add(new THREE.BoxGeometry(0.015, wallH, D), glass, x, baseTop + wallH / 2, 0, pane);
+for (const s of [-1, 1])
+  add(new THREE.BoxGeometry(L, 0.015, rafterLen), glass, 0, baseTop + wallH + roofRise / 2, s * D / 4, { ...pane, rot: [s * pitch, 0, 0] });
+const gable = new THREE.Shape([new THREE.Vector2(-D / 2, 0), new THREE.Vector2(D / 2, 0), new THREE.Vector2(0, roofRise)]);
+for (const x of [-L / 2, L / 2])
+  add(new THREE.ShapeGeometry(gable), glass, x, baseTop + wallH, 0, { ...pane, rot: [0, Math.PI / 2, 0] });
+
+// ---------------------------------------------------------------- plants
+const leafMat = clay(T.leaf, 0.82, 0.8), leafLight = clay(T.leafLight, 0.82, 0.8);
+const leafGeo = new THREE.SphereGeometry(1, 20, 14);
+
+// A rosette of tapered, slightly cupped leaves radiating from the stem.
+function plant(parent, x, z, size = 1, seed = 1) {
+  const g = new THREE.Group();
+  g.position.set(x, 0, z);
+  g.scale.setScalar(size);
+  g.rotation.y = seed * 1.7;
+  parent.add(g);
+  const n = 6 + (seed % 3);
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    const tilt = 0.55 + ((i * 37 + seed * 11) % 10) / 30; // how far the leaf leans out
+    const len = 0.2 + ((i * 13 + seed) % 5) * 0.025;
+    const leaf = new THREE.Group();
+    leaf.rotation.set(0, -a, 0);
+    g.add(leaf);
+    const blade = add(leafGeo, i % 2 ? leafMat : leafLight, 0, 0, 0, { parent: leaf, scale: [len * 0.42, len * 0.12, len] });
+    blade.position.set(0, len * Math.cos(tilt) * 0.9, len * Math.sin(tilt) * 0.9);
+    blade.rotation.x = -tilt;
+  }
+  // new growth in the middle
+  add(leafGeo, leafLight, 0, 0.2, 0, { parent: g, scale: [0.05, 0.13, 0.05] });
+  return g;
+}
+
+for (const [z, off] of [[-0.52, 0], [0.52, 0.2]]) {
+  const bed = new THREE.Group();
+  bed.position.set(0, baseTop, z);
+  gh.add(bed);
+  add(new RoundedBoxGeometry(L - 0.55, 0.3, 0.62, 4, 0.08), clay(T.bed, 0.9, 1.6), 0, 0.15, 0, { parent: bed });
+  add(new RoundedBoxGeometry(L - 0.72, 0.05, 0.47, 3, 0.02), clay(T.soil, 0.97, 3.0), 0, 0.3, 0, { parent: bed });
+  const row = new THREE.Group();
+  row.position.y = 0.3;
+  bed.add(row);
+  for (let i = 0; i < 5; i++) plant(row, -1.2 + i * 0.6 + off, 0, 0.85 + (i % 3) * 0.12, i + (z > 0 ? 5 : 0));
+}
+
+// terracotta pot with a larger plant, left of the greenhouse
+const potProfile = [[0, 0], [0.3, 0], [0.34, 0.04], [0.42, 0.56], [0.48, 0.58], [0.49, 0.7], [0.45, 0.72], [0.41, 0.64], [0, 0.64]]
+  .map(([r, y]) => new THREE.Vector2(r, y));
+const pot = new THREE.Group();
+pot.position.set(-2.35, plinthTop, 1.35);
+pot.scale.setScalar(0.8);
+scene.add(pot);
+add(new THREE.LatheGeometry(potProfile, 56), clay(T.pot, 0.84, 1.4), 0, 0, 0, { parent: pot });
+add(new THREE.CylinderGeometry(0.4, 0.4, 0.03, 40), clay(T.soil, 0.97, 3), 0, 0.64, 0, { parent: pot });
+const potTop = new THREE.Group();
+potTop.position.y = 0.64;
+pot.add(potTop);
+plant(potTop, 0, 0, 2.3, 3);
+
+// the sensor in front
+const sensor = new THREE.Group();
+sensor.position.set(0.5, plinthTop, 2.05);
+sensor.rotation.y = 0.25;
+scene.add(sensor);
+add(new RoundedBoxGeometry(0.3, 0.46, 0.2, 5, 0.09), clay(T.clay, 0.78, 0.8), 0, 0.23, 0, { parent: sensor });
+const led = new THREE.MeshStandardMaterial({
+  color: "#E88A5E", emissive: "#F08A55", emissiveIntensity: theme === "dark" ? 3.2 : 1.4, roughness: 0.3,
+});
+add(new THREE.SphereGeometry(0.03, 16, 12), led, 0, 0.36, 0.1, { parent: sensor, cast: false });
+for (let r = 0; r < 2; r++) for (let c = 0; c < 3; c++)
+  add(new THREE.SphereGeometry(0.012, 8, 6), clay(T.frame, 0.9, 0.3), -0.05 + c * 0.05, 0.2 - r * 0.05, 0.1, { parent: sensor, cast: false });
+
+// ---------------------------------------------------------------- post-processing
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const gtao = new GTAOPass(scene, camera, W * SS, H * SS);
+gtao.output = GTAOPass.OUTPUT.Default;
+gtao.blendIntensity = T.ao;
+gtao.updateGtaoMaterial({ radius: 0.35, distanceExponent: 1.6, thickness: 1.2, scale: 1.1, samples: 16 });
+gtao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 3, samples: 16 });
+composer.addPass(gtao);
+composer.addPass(new OutputPass());
+
+let frames = 0;
+function loop() {
+  composer.render();
+  if (++frames < 8) requestAnimationFrame(loop);
+  else window.__done = true;
+}
+loop();
+</script>
+</body>
+</html>
