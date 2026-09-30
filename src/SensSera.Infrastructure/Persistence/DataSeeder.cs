@@ -17,12 +17,14 @@ public static class DataSeeder
         if (await db.Organizations.AnyAsync())
             return;
 
+        var now = scope.ServiceProvider.GetRequiredService<TimeProvider>().GetUtcNow().UtcDateTime;
+
         var org = new Organization
         {
             Name = "Demo Org",
             Slug = "demo",
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow,
+            CreatedAt = now,
+            UpdatedAt = now,
         };
 
         var admin = new User
@@ -31,8 +33,8 @@ public static class DataSeeder
             PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin1234!"),
             Role = Role.Admin,
             Organization = org,
-            CreatedAt = DateTime.UtcNow,
-            UpdatedAt = DateTime.UtcNow,
+            CreatedAt = now,
+            UpdatedAt = now,
         };
 
         db.Organizations.Add(org);
