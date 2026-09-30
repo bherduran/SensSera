@@ -21,9 +21,10 @@ export function LiveStamp({ connected }: { connected: boolean }) {
   }, []);
 
   return (
-    <div className="text-right" aria-live="polite">
-      <p className="label-caps">{connected ? "Live" : "Offline"}</p>
-      <p className="mt-1 flex items-center justify-end gap-1.5 font-mono text-[13px]">
+    <div className="text-right">
+      {/* Only the connection state is announced; the ticking clock would be read out every second. */}
+      <p className="label-caps" aria-live="polite">{connected ? "Live" : "Offline"}</p>
+      <p aria-hidden className="mt-1 flex items-center justify-end gap-1.5 font-mono text-[13px]">
         <span
           className={cn(
             "inline-block size-[7px] rounded-full",

@@ -22,19 +22,21 @@ const NAV = [
   { href: "/alerts", label: "Alerts" },
 ] as const;
 
-/** The notebook's table of contents: numbered entries, the open one underlined in ink. */
-function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
+/**
+ * The notebook's table of contents: numbered entries, the open one underlined in ink.
+ * Inside the mobile dropdown each entry is a menu item, so arrow keys and menu roles work.
+ */
+function NavLinks({ inMenu = false }: { inMenu?: boolean }) {
   const pathname = usePathname();
   return (
     <nav aria-label="Main" className="flex flex-col gap-1">
       <p className="label-caps mb-2 px-2">Contents</p>
       {NAV.map(({ href, label }, i) => {
         const active = pathname === href || pathname.startsWith(`${href}/`);
-        return (
+        const link = (
           <Link
             key={href}
             href={href}
-            onClick={onNavigate}
             aria-current={active ? "page" : undefined}
             className={cn(
               "group flex items-baseline gap-3 px-2 py-1.5 transition-colors",
@@ -51,6 +53,13 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
               {label}
             </span>
           </Link>
+        );
+        return inMenu ? (
+          <DropdownMenuItem key={href} asChild>
+            {link}
+          </DropdownMenuItem>
+        ) : (
+          link
         );
       })}
     </nav>
@@ -113,7 +122,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-56 p-2">
-                <NavLinks />
+                <NavLinks inMenu />
               </DropdownMenuContent>
             </DropdownMenu>
           </div>

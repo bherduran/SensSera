@@ -29,6 +29,7 @@ import { Switch } from "@/components/ui/switch";
 import { useCreateThreshold, useUpdateThreshold } from "@/hooks/use-thresholds";
 import { METRICS, type Threshold } from "@/lib/types";
 import { METRIC_META } from "@/lib/metrics";
+import { ApiError } from "@/lib/api";
 
 const nullableNumber = z
   .number({ message: "Enter a number" })
@@ -93,8 +94,12 @@ export function ThresholdFormDialog({
         toast.success("Threshold created");
       }
       setOpen(false);
-    } catch {
-      toast.error("Could not save the threshold. Please try again.");
+    } catch (e) {
+      toast.error(
+        e instanceof ApiError && e.status === 409
+          ? "This greenhouse already has a threshold for that metric. Edit it instead."
+          : "Could not save the threshold. Please try again.",
+      );
     }
   }
 

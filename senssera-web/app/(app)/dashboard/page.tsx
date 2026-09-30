@@ -128,7 +128,7 @@ function GreenhouseSheet({ greenhouse, index }: { greenhouse: GreenhouseSummary;
         </div>
         {greenhouse.activeAlerts > 0 ? (
           <Link
-            href="/alerts"
+            href={`/alerts?status=open&greenhouse=${greenhouse.greenhouseId}`}
             className="inline-flex items-center gap-1.5 font-mono text-xs text-alert-text underline-offset-4 hover:underline"
           >
             <span className="size-2 rounded-full bg-alert" />

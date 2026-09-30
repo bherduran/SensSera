@@ -26,8 +26,12 @@ export type Metric = (typeof METRICS)[number];
 export type Greenhouse = Schemas["GreenhouseResponse"];
 export type GreenhouseInput = Schemas["GreenhouseRequest"];
 
-export type Device = Omit<Schemas["DeviceResponse"], "metric"> & {
+export const DEVICE_STATUSES = ["active", "inactive"] as const;
+export type DeviceStatus = (typeof DEVICE_STATUSES)[number];
+
+export type Device = Omit<Schemas["DeviceResponse"], "metric" | "status"> & {
   metric: Metric;
+  status: DeviceStatus;
 };
 export type DeviceInput = Omit<Schemas["DeviceRequest"], "metric"> & {
   metric: Metric;

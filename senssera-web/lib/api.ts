@@ -30,6 +30,17 @@ async function rawRefresh(): Promise<boolean> {
   }
 }
 
+// Fired when a request is still unauthorized after a refresh attempt: the refresh cookie is gone,
+// expired or revoked (reuse detection). AuthProvider listens and drops the session.
+const sessionExpiredListeners = new Set<() => void>();
+
+export function onSessionExpired(listener: () => void): () => void {
+  sessionExpiredListeners.add(listener);
+  return () => {
+    sessionExpiredListeners.delete(listener);
+  };
+}
+
 export function tryRefresh(): Promise<boolean> {
   if (!refreshPromise) {
     refreshPromise = rawRefresh().finally(() => {
@@ -78,6 +89,8 @@ export async function apiFetch<T>(
   if (res.status === 401 && retryOn401) {
     const refreshed = await tryRefresh();
     if (refreshed) return apiFetch<T>(path, { ...options, retryOn401: false });
+    accessToken = null;
+    sessionExpiredListeners.forEach((l) => l());
   }
 
   if (!res.ok) {

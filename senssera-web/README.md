@@ -1,36 +1,36 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# senssera-web
 
-## Getting Started
+Next.js 16 frontend for SensSera. Project overview, architecture and the full-stack Docker setup are in the [root README](../README.md).
 
-First, run the development server:
+## Run
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev        # http://localhost:3000, expects the API on http://localhost:5010
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Environment
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Variable | Where | Purpose |
+|---|---|---|
+| `NEXT_PUBLIC_API_URL` | local, docker compose | API base URL the browser calls directly. Inlined at build time. |
+| `API_ORIGIN` | Vercel | Azure API origin. `next.config.ts` proxies `/api` and `/hubs` to it, so the browser stays same-origin and the refresh cookie is first-party. |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+On Vercel `NEXT_PUBLIC_VERCEL_ENV` is set automatically and the client uses relative URLs (`lib/config.ts`).
 
-## Learn More
+## Scripts
 
-To learn more about Next.js, take a look at the following resources:
+| Script | |
+|---|---|
+| `npm run lint` / `npx tsc --noEmit` / `npm test` / `npm run build` | The checks CI runs. |
+| `npm run gen:api` | Regenerates `lib/api-schema.ts` from the running API's OpenAPI document. `lib/types.ts` derives the domain types from it. |
+| `npm run hero` | Re-renders the static hero fallbacks in `public/hero/` with the locally installed Chrome. |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Layout
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `app/`: routes. `(auth)` holds sign-in and sign-up, `(app)` the authenticated pages behind the auth guard and the shared SignalR connection.
+- `lib/`: API client (in-memory access token, single-flight refresh), auth context, SignalR, types, band math.
+- `hooks/`: TanStack Query hooks, one file per resource.
+- `components/notebook/`: the design's signature pieces (`BandGauge`, `FieldNote`, `SpecimenHeader`, `LiveStamp`).
+- `components/ui/`: shadcn/ui primitives, restyled through the tokens in `app/globals.css`.
+- `lib/hero/greenhouse-scene.ts`: the live three.js clay greenhouse on the sign-in page.
