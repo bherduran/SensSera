@@ -63,7 +63,7 @@ cd src/SensSera.Api
 dotnet user-secrets set "Llm:ApiKey" "<your key>"
 ```
 
-and set `"Llm": { "Provider": "Groq", "Model": "llama-3.3-70b-versatile" }` in `appsettings.Development.json`.
+and set `"Llm": { "Provider": "Groq", "Model": "openai/gpt-oss-120b" }` in `appsettings.Development.json`.
 
 ## Tests
 

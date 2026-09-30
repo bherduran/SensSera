@@ -39,7 +39,7 @@ services:
       Jwt__Audience: SensSera
       Cors__AllowedOrigins__0: http://localhost:3000
       Llm__Provider: ${LLM_PROVIDER:-Groq}
-      Llm__Model: ${LLM_MODEL:-llama-3.3-70b-versatile}
+      Llm__Model: ${LLM_MODEL:-openai/gpt-oss-120b}
       Llm__ApiKey: ${LLM_API_KEY:-}
     ports:
       - "5010:8080"

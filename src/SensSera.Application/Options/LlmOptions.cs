@@ -19,7 +19,7 @@ public sealed class LlmOptions
     public string Provider { get; set; } = "Anthropic";
 
     /// <summary>Model id for the active <see cref="Provider"/>. Authoritative ids come from config,
-    /// never hardcoded (Anthropic e.g. "claude-opus-5"; Groq e.g. "llama-3.3-70b-versatile").</summary>
+    /// never hardcoded (Anthropic e.g. "claude-opus-5"; Groq e.g. "openai/gpt-oss-120b").</summary>
     [Required]
     public string Model { get; set; } = "claude-opus-5";
 
