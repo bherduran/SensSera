@@ -10,7 +10,7 @@ using SensSera.Domain.Entities;
 
 namespace SensSera.Infrastructure.Services;
 
-public sealed class JwtService(IOptions<JwtOptions> options) : IJwtService
+public sealed class JwtService(IOptions<JwtOptions> options, TimeProvider timeProvider) : IJwtService
 {
     private readonly JwtOptions _opts = options.Value;
     public string GenerateAccessToken(User user)
@@ -30,7 +30,7 @@ public sealed class JwtService(IOptions<JwtOptions> options) : IJwtService
             issuer: _opts.Issuer,
             audience: _opts.Audience,
             claims: claims, 
-            expires: DateTime.UtcNow.AddMinutes(15),
+            expires: timeProvider.GetUtcNow().UtcDateTime.AddMinutes(15),
         signingCredentials: creds);
         
         return new JwtSecurityTokenHandler().WriteToken(token);

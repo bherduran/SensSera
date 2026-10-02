@@ -10,6 +10,8 @@ public class RefreshTokenConfiguration : IEntityTypeConfiguration<RefreshToken>
     {
         builder.HasKey( r => r.Id);
         builder.Property(r => r.TokenHash).IsRequired();
+        // Every refresh looks a token up by its hash.
+        builder.HasIndex(r => r.TokenHash).IsUnique();
 
         builder.HasOne(r => r.User)
             .WithMany(u => u.RefreshTokens)

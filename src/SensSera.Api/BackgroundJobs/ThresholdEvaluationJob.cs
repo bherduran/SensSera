@@ -19,6 +19,8 @@ public sealed class ThresholdEvaluationJob(
     private readonly TimeSpan _interval = TimeSpan.FromSeconds(
         configuration.GetValue("Jobs:ThresholdEvaluationIntervalSeconds", 30));
 
+    private static readonly TimeSpan StaleAfter = TimeSpan.FromHours(24);
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         using var timer = new PeriodicTimer(_interval);
@@ -45,39 +47,56 @@ public sealed class ThresholdEvaluationJob(
             .Where(t => t.IsEnabled)
             .ToListAsync(cancellationToken);
 
+        if (thresholds.Count == 0) return;
+
+        // Everything the loop needs is loaded up front: a fixed number of queries per cycle,
+        // however many thresholds and devices there are.
+        var greenhouseIds = thresholds.Select(t => t.GreenhouseId).Distinct().ToList();
+        var devices = await db.Devices
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(d => greenhouseIds.Contains(d.GreenhouseId))
+            .Select(d => new { d.Id, d.GreenhouseId, d.Metric })
+            .ToListAsync(cancellationToken);
+
+        // Readings older than a day are stale; a silent device is the heartbeat job's concern, not a
+        // fresh breach. The window also keeps this on the (DeviceId, RecordedAt) index.
+        var deviceIds = devices.Select(d => d.Id).ToList();
+        var since = now - StaleAfter;
+        var latestByDevice = await db.SensorReadings
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(r => deviceIds.Contains(r.DeviceId) && r.RecordedAt >= since)
+            .GroupBy(r => r.DeviceId)
+            .Select(g => g.OrderByDescending(r => r.RecordedAt).First())
+            .ToDictionaryAsync(r => r.DeviceId, cancellationToken);
+
+        var thresholdIds = thresholds.Select(t => t.Id).ToList();
+        var withOpenAlert = (await db.Alerts
+            .IgnoreQueryFilters()
+            .Where(a => thresholdIds.Contains(a.ThresholdId) && a.Status == AlertStatus.Open)
+            .Select(a => a.ThresholdId)
+            .ToListAsync(cancellationToken)).ToHashSet();
+
         var raised = new List<Alert>();
 
         foreach (var t in thresholds)
         {
-            var devices = await db.Devices
-                .IgnoreQueryFilters()
-                .AsNoTracking()
+            if (withOpenAlert.Contains(t.Id)) continue;
+
+            var latest = devices
                 .Where(d => d.GreenhouseId == t.GreenhouseId && d.Metric == t.Metric)
-                .Select(d => d.Id)
-                .ToListAsync(cancellationToken);
-
-            if (devices.Count == 0) continue;
-
-            var latest = await db.SensorReadings
-                .IgnoreQueryFilters()
-                .AsNoTracking()
-                .Where(r => devices.Contains(r.DeviceId))
-                .OrderByDescending(r => r.RecordedAt)
-                .FirstOrDefaultAsync(cancellationToken);    
+                .Select(d => latestByDevice.GetValueOrDefault(d.Id))
+                .OfType<SensorReading>()
+                .MaxBy(r => r.RecordedAt);
 
             if (latest is null) continue;
 
-            var outOfRange = 
-                (t.MinValue is { } min && latest.Value < min)  ||
-                (t.MaxValue is { } max && latest.Value > max);    
+            var outOfRange =
+                (t.MinValue is { } min && latest.Value < min) ||
+                (t.MaxValue is { } max && latest.Value > max);
 
             if (!outOfRange) continue;
-
-            var hasOpen = await db.Alerts
-                .IgnoreQueryFilters()
-                .AnyAsync(a => a.ThresholdId == t.Id && a.Status == AlertStatus.Open, cancellationToken);
-
-            if (hasOpen) continue;
 
             var alert = new Alert
             {

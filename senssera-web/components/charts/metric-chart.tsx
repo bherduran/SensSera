@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useReducedMotion } from "motion/react";
 import {
   Area,
   AreaChart,
@@ -14,18 +14,6 @@ import {
 
 export type ChartPoint = { t: number; value: number };
 export type ChartBand = { min: number | null; max: number | null };
-
-function useReducedMotion() {
-  const [reduced, setReduced] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const update = () => setReduced(mq.matches);
-    update();
-    mq.addEventListener("change", update);
-    return () => mq.removeEventListener("change", update);
-  }, []);
-  return reduced;
-}
 
 const timeFmt = (t: number) =>
   new Date(t).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });

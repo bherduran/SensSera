@@ -158,8 +158,8 @@ function ThresholdRow({
               <AlertDialogHeader>
                 <AlertDialogTitle>Delete threshold?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This removes the {meta?.label ?? threshold.metric} threshold.
-                  Existing alerts are kept.
+                  This removes the {meta?.label ?? threshold.metric} threshold
+                  together with the alerts it raised.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>

@@ -51,6 +51,8 @@ jobs:
           cache-dependency-path: senssera-web/package-lock.json
 
       - run: npm ci
+      # Counterpart of the backend's vulnerable-package gate; only shipped (non-dev) deps block.
+      - run: npm audit --omit=dev --audit-level=high
       - run: npm run lint
       - run: npx tsc --noEmit
       - run: npm test

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using SensSera.Application.DTOs;
+using SensSera.Application.Exceptions;
 using SensSera.Application.Interfaces;
 using SensSera.Domain.Entities;
 using SensSera.Domain.Enums;
@@ -38,6 +39,8 @@ public sealed class ThresholdService(AppDbContext db, ITenantContext tenant, Tim
         if (request.MinValue is null && request.MaxValue is null)
             throw new ArgumentException("At least one of MinValue or MaxValue must be set");
 
+        await EnsureUniqueMetricAsync(request.GreenhouseId, request.Metric, null, cancellationToken);
+
         var t = new Threshold
         {
             OrganizationId = orgId,
@@ -66,6 +69,8 @@ public sealed class ThresholdService(AppDbContext db, ITenantContext tenant, Tim
         if (request.MinValue is null && request.MaxValue is null)
             throw new ArgumentException("At least one of MinValue or MaxValue must be set");
 
+        await EnsureUniqueMetricAsync(t.GreenhouseId, request.Metric, t.Id, cancellationToken);
+
         t.Metric = request.Metric;
         t.MinValue = request.MinValue;            
         t.MaxValue = request.MaxValue; 
@@ -92,6 +97,16 @@ public sealed class ThresholdService(AppDbContext db, ITenantContext tenant, Tim
 
         db.Thresholds.Remove(t);
         await db.SaveChangesAsync(cancellationToken);
+    }
+
+    // One threshold per metric per greenhouse (also enforced by a unique index); a second one
+    // would make the evaluation job raise duplicate alerts for the same breach.
+    private async Task EnsureUniqueMetricAsync(Guid greenhouseId, MetricType metric, Guid? exceptId, CancellationToken cancellationToken)
+    {
+        var taken = await db.Thresholds
+            .AnyAsync(t => t.GreenhouseId == greenhouseId && t.Metric == metric && t.Id != exceptId, cancellationToken);
+        if (taken)
+            throw new ConflictException($"A {metric} threshold already exists for this greenhouse");
     }
 
     private async Task VerifyGreenhouseOwnershipAsync(Guid greenhouseId, Guid orgId, CancellationToken cancellationToken = default)

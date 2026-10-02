@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useMemo } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -9,6 +10,7 @@ import {
   useResolveAlert,
 } from "@/hooks/use-alerts";
 import { useGreenhouses } from "@/hooks/use-greenhouses";
+import { useAuth } from "@/lib/auth";
 import { useTelemetry } from "@/hooks/use-telemetry";
 import { METRIC_META } from "@/lib/metrics";
 import type { Alert, AlertSeverity, Metric } from "@/lib/types";
@@ -29,11 +31,36 @@ import { ExplainAlertDialog } from "@/components/insights/explain-alert-dialog";
 const PAGE_SIZE = 20;
 const STATUS_OPTIONS = ["open", "acknowledged", "resolved"] as const;
 
+// useSearchParams needs a Suspense boundary so the page can still be prerendered.
 export default function AlertsPage() {
+  return (
+    <Suspense fallback={<Skeleton className="mx-auto h-72 max-w-6xl rounded-md" />}>
+      <AlertsLedger />
+    </Suspense>
+  );
+}
+
+function AlertsLedger() {
   const qc = useQueryClient();
-  const [status, setStatus] = useState<string | undefined>(undefined);
-  const [greenhouseId, setGreenhouseId] = useState<string | undefined>(undefined);
-  const [page, setPage] = useState(1);
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
+
+  // Filters live in the URL: they survive a refresh, and other pages can link to a filtered view.
+  const statusParam = params.get("status");
+  const status = STATUS_OPTIONS.find((s) => s === statusParam);
+  const greenhouseId = params.get("greenhouse") ?? undefined;
+  const page = Math.max(1, Number(params.get("page")) || 1);
+
+  function setFilters(next: { status?: string; greenhouse?: string; page?: number }) {
+    const merged = { status, greenhouse: greenhouseId, page, ...next };
+    const query = new URLSearchParams();
+    if (merged.status) query.set("status", merged.status);
+    if (merged.greenhouse) query.set("greenhouse", merged.greenhouse);
+    if (merged.page && merged.page > 1) query.set("page", String(merged.page));
+    const qs = query.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }
 
   const greenhouses = useGreenhouses();
   const { data, isLoading, isError } = useAlerts({
@@ -81,10 +108,7 @@ export default function AlertsPage() {
                 key={s ?? "all"}
                 type="button"
                 aria-pressed={active}
-                onClick={() => {
-                  setStatus(s);
-                  setPage(1);
-                }}
+                onClick={() => setFilters({ status: s, page: 1 })}
                 className={cn(
                   "label-caps pb-1 transition-colors hover:text-foreground",
                   active && "border-b-[1.5px] border-foreground text-foreground",
@@ -98,10 +122,7 @@ export default function AlertsPage() {
 
         <Select
           value={greenhouseId ?? "all"}
-          onValueChange={(v) => {
-            setGreenhouseId(v === "all" ? undefined : v);
-            setPage(1);
-          }}
+          onValueChange={(v) => setFilters({ greenhouse: v === "all" ? undefined : v, page: 1 })}
         >
           <SelectTrigger className="w-56">
             <SelectValue placeholder="Greenhouse" />
@@ -163,10 +184,10 @@ export default function AlertsPage() {
             {from}–{to} of {total}
           </span>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+            <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setFilters({ page: Math.max(1, page - 1) })}>
               ← Previous
             </Button>
-            <Button variant="outline" size="sm" disabled={to >= total} onClick={() => setPage((p) => p + 1)}>
+            <Button variant="outline" size="sm" disabled={to >= total} onClick={() => setFilters({ page: page + 1 })}>
               Next →
             </Button>
           </div>
@@ -185,6 +206,8 @@ const stamp = (iso: string) => {
 const valueFmt = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
 
 function AlertEntry({ alert, greenhouse }: { alert: Alert; greenhouse?: string }) {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "Admin";
   const meta = METRIC_META[alert.metric as Metric];
   const ack = useAcknowledgeAlert();
   const resolve = useResolveAlert();
@@ -231,7 +254,7 @@ function AlertEntry({ alert, greenhouse }: { alert: Alert; greenhouse?: string }
             acknowledge
           </button>
         )}
-        {alert.status !== "resolved" && (
+        {isAdmin && alert.status !== "resolved" && (
           <button type="button" className={textAction} disabled={resolve.isPending} onClick={() => run(resolve, "Alert resolved")}>
             resolve
           </button>

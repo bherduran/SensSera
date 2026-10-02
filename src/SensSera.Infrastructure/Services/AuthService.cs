@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using SensSera.Application.DTOs;
+using SensSera.Application.Exceptions;
 using SensSera.Application.Interfaces;
 using SensSera.Domain.Entities;
 using SensSera.Domain.Enums;
@@ -18,7 +19,7 @@ public sealed class AuthService(
     public async Task<(LoginResponse Response, string RefreshToken)> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default)
     {
         if (await db.Users.IgnoreQueryFilters().AnyAsync(u => u.Email == request.Email, cancellationToken))
-            throw new ArgumentException("Email already in use");
+            throw new ConflictException("Email already in use");
 
         var org = new Organization
         {

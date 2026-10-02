@@ -64,6 +64,21 @@ export default function GreenhouseDetailPage() {
     setReveal({ token: device.token, name: device.name });
   }
 
+  // Unknown id or another tenant's greenhouse: the API answers 404.
+  if (greenhouse.isError) {
+    return (
+      <div className="mx-auto max-w-5xl">
+        <div className="rounded-md border bg-card p-10 text-center paper-shadow">
+          <p className="font-serif text-2xl">This greenhouse isn’t in your notebook.</p>
+          <p className="mt-2 text-sm text-muted-foreground">It may have been deleted, or the link is wrong.</p>
+          <Link href="/greenhouses" className="mt-4 inline-block font-serif italic underline underline-offset-4">
+            Back to all greenhouses →
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <div>
@@ -218,7 +233,7 @@ function DeviceRow({
         <span className="inline-flex items-center gap-1.5 font-mono text-xs">
           <span
             className={
-              device.status === "Active"
+              device.status === "active"
                 ? "inline-block h-2 w-2 rounded-full bg-foreground"
                 : "inline-block h-2 w-2 rounded-full bg-muted-foreground/50"
             }
@@ -229,15 +244,32 @@ function DeviceRow({
       {isAdmin && (
         <TableCell className="text-right">
           <div className="flex justify-end gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Rotate token"
-              onClick={handleRotate}
-              disabled={rotate.isPending}
-            >
-              <KeyRound className="h-4 w-4" />
-            </Button>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Rotate token"
+                  disabled={rotate.isPending}
+                >
+                  <KeyRound className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Rotate the token for “{device.name}”?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    A new token is issued and the current one stops working
+                    immediately. The device can&apos;t send readings until it is
+                    configured with the new token.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleRotate}>Rotate token</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
@@ -253,8 +285,8 @@ function DeviceRow({
                 <AlertDialogHeader>
                   <AlertDialogTitle>Delete “{device.name}”?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This removes the device and its readings. This cannot be
-                    undone.
+                    This removes the device with its readings and alert history.
+                    This cannot be undone.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>

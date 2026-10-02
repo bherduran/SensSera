@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using SensSera.Application.Exceptions;
 using SensSera.Application.Llm;
 using System.Text.Json;
 
@@ -27,6 +28,7 @@ public sealed class ExceptionMiddleware(
         // Thrown only for failed authentication (bad credentials, missing/invalid refresh token).
         UnauthorizedAccessException => (StatusCodes.Status401Unauthorized, "Unauthorized", ex.Message),
         ArgumentException => (StatusCodes.Status400BadRequest, "Bad Request", ex.Message),
+        ConflictException => (StatusCodes.Status409Conflict, "Conflict", ex.Message),
         // Provider detail (may echo auth errors) stays in the log, never in the response.
         LlmUnavailableException => (StatusCodes.Status503ServiceUnavailable, "AI insights unavailable", "The AI provider is not configured or not reachable right now."),
         _ => (StatusCodes.Status500InternalServerError, "An unexpected error occurred", "An unexpected error occurred. Please try again later."),

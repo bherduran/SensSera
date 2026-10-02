@@ -9,7 +9,7 @@ public record DeviceResponse(
     string Name,
     Guid GreenhouseId,
     MetricType Metric,
-    string Status,
+    DeviceStatus Status,
     DateTime CreatedAt);
 
 public record DeviceWithTokenResponse(

@@ -8,7 +8,8 @@ import {
   useMemo,
   useState,
 } from "react";
-import { apiFetch, setAccessToken, tryRefresh } from "./api";
+import { useQueryClient } from "@tanstack/react-query";
+import { apiFetch, onSessionExpired, setAccessToken, tryRefresh } from "./api";
 
 export type User = { id: string; email: string; role: string };
 type LoginResponse = { accessToken: string; expiresIn: number; user: User };
@@ -73,6 +74,19 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [status, setStatus] = useState<AuthStatus>("loading");
+  const queryClient = useQueryClient();
+
+  // A dead session (refresh failed mid-use) sends the user back to sign in; the cached queries
+  // belong to that session and must not leak into the next one.
+  useEffect(
+    () =>
+      onSessionExpired(() => {
+        queryClient.clear();
+        setUser(null);
+        setStatus("guest");
+      }),
+    [queryClient],
+  );
 
   // Bootstrap on load: the access token is gone after a refresh, so try the
   // refresh cookie once and rehydrate the session from /me if it works.
@@ -116,9 +130,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     await apiLogout();
+    queryClient.clear();
     setUser(null);
     setStatus("guest");
-  }, []);
+  }, [queryClient]);
 
   const value = useMemo(
     () => ({ user, status, login, register, logout }),
