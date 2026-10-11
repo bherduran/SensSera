@@ -50,7 +50,7 @@ The .NET solution is layered with one-way references: `Api → Application + Inf
 - **Backend:** ASP.NET Core (.NET 10), EF Core, PostgreSQL, SignalR, FluentValidation, Serilog
 - **Auth:** JWT access token (kept in memory) and a rotating httpOnly refresh cookie with reuse detection (a replayed token revokes every session), BCrypt passwords
 - **Frontend:** Next.js 16, TypeScript, Tailwind v4, shadcn/ui primitives, TanStack Query, Recharts, three.js, Motion. API types are generated from the OpenAPI document.
-- **AI:** provider-agnostic `ILlmClient` with Groq (`openai/gpt-oss-120b`, used in the demo) and Anthropic adapters
+- **AI:** provider-agnostic `ILlmClient` with an OpenAI-compatible adapter (Groq `openai/gpt-oss-120b` in the demo, or a local Ollama model) and an Anthropic adapter
 - **Ops:** Docker Compose, GitHub Actions (CI + OIDC deploy), Azure App Service / PostgreSQL / Key Vault, Vercel, Dependabot, Testcontainers
 
 ## Run it locally
@@ -74,7 +74,7 @@ dotnet run --project src/SensSera.Simulator    # provisions demo devices itself
 cd senssera-web && npm install && npm run dev  # http://localhost:3000
 ```
 
-The API needs a gitignored `src/SensSera.Api/appsettings.Development.json` with `ConnectionStrings:DefaultConnection` and `Jwt:Key/Issuer/Audience`. For AI locally, run `dotnet user-secrets set "Llm:ApiKey" "<key>"` in `src/SensSera.Api` and set `"Llm": { "Provider": "Groq", "Model": "openai/gpt-oss-120b" }`.
+The API needs a gitignored `src/SensSera.Api/appsettings.Development.json` with `ConnectionStrings:DefaultConnection` and `Jwt:Key/Issuer/Audience`. For AI locally, run `dotnet user-secrets set "Llm:ApiKey" "<key>"` in `src/SensSera.Api` and set `"Llm": { "Provider": "Groq", "Model": "openai/gpt-oss-120b" }`. To run fully offline, use [Ollama](https://ollama.com) instead: `ollama pull qwen3:8b` and set `"Llm": { "Provider": "Ollama", "Model": "qwen3:8b" }` (no key; `Llm:BaseUrl` defaults to `http://localhost:11434/v1/`).
 
 ## Tests
 

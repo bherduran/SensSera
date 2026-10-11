@@ -41,6 +41,11 @@ services:
       Llm__Provider: ${LLM_PROVIDER:-Groq}
       Llm__Model: ${LLM_MODEL:-openai/gpt-oss-120b}
       Llm__ApiKey: ${LLM_API_KEY:-}
+      Llm__BaseUrl: ${LLM_BASE_URL:-}
+    # Lets the container reach a host-side Ollama at host.docker.internal (needed on Linux;
+    # Docker Desktop already provides it).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "5010:8080"
 

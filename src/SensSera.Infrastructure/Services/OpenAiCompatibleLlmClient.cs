@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.Options;
 using SensSera.Application.Interfaces;
 using SensSera.Application.Llm;
@@ -10,16 +11,30 @@ using SensSera.Application.Options;
 namespace SensSera.Infrastructure.Services;
 
 /// <summary>
-/// Groq-backed <see cref="ILlmClient"/> — a free, OpenAI-compatible provider used for local/dev
-/// testing without an Anthropic key. Like <see cref="AnthropicLlmClient"/>, this is the only place
-/// that speaks the vendor wire format: a provider swap is confined to one adapter. Talks the
-/// OpenAI <c>/chat/completions</c> shape over a typed <see cref="HttpClient"/> whose base address
-/// and bearer key are set once at the composition root — the key never rides in bound options.
+/// <see cref="ILlmClient"/> for any OpenAI-compatible <c>/chat/completions</c> endpoint — Groq in the
+/// cloud, Ollama locally. Like <see cref="AnthropicLlmClient"/>, this is the only place that speaks
+/// this wire format. The base address, timeout and optional bearer key are set once on the typed
+/// <see cref="HttpClient"/> at the composition root — the key never rides in bound options.
 /// </summary>
-public sealed class GroqLlmClient(HttpClient http, IOptions<LlmOptions> options) : ILlmClient
+public sealed partial class OpenAiCompatibleLlmClient(HttpClient http, IOptions<LlmOptions> options) : ILlmClient
 {
+    public const string GroqBaseUrl = "https://api.groq.com/openai/v1/";
+    public const string OllamaBaseUrl = "http://localhost:11434/v1/";
+
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
     private readonly LlmOptions _options = options.Value;
+
+    /// <summary>Configured <see cref="LlmOptions.BaseUrl"/>, or the provider default when empty.</summary>
+    public static Uri ResolveBaseAddress(LlmOptions options)
+    {
+        var url = string.IsNullOrWhiteSpace(options.BaseUrl)
+            ? options.Provider == "Ollama" ? OllamaBaseUrl : GroqBaseUrl
+            : options.BaseUrl;
+
+        // "chat/completions" is resolved relative to the base; without the trailing slash HttpClient
+        // would replace the last segment ("v1") instead of appending to it.
+        return new Uri(url.EndsWith('/') ? url : url + "/");
+    }
 
     public async Task<LlmCompletion> CompleteAsync(LlmPrompt prompt, CancellationToken cancellationToken = default)
     {
@@ -118,14 +133,14 @@ public sealed class GroqLlmClient(HttpClient http, IOptions<LlmOptions> options)
         catch (Exception ex) when (ex is HttpRequestException
                                    || (ex is TaskCanceledException && !cancellationToken.IsCancellationRequested))
         {
-            throw new LlmUnavailableException("Groq request failed.", ex);
+            throw new LlmUnavailableException($"{_options.Provider} request failed.", ex);
         }
 
         using (response)
         {
             var payload = await response.Content.ReadAsStringAsync(cancellationToken);
             if (!response.IsSuccessStatusCode)
-                throw new LlmUnavailableException($"Groq request failed ({(int)response.StatusCode}): {payload}");
+                throw new LlmUnavailableException($"{_options.Provider} request failed ({(int)response.StatusCode}): {payload}");
 
             return JsonDocument.Parse(payload);
         }
@@ -156,10 +171,15 @@ public sealed class GroqLlmClient(HttpClient http, IOptions<LlmOptions> options)
     private static JsonObject ToolMessage(string toolCallId, string content) =>
         new() { ["role"] = "tool", ["tool_call_id"] = toolCallId, ["content"] = content };
 
+    // Qwen3 (Ollama) emits its reasoning as <think>…</think> before the answer. An unclosed block means
+    // max_tokens cut the model off mid-thought, so there is no answer to keep.
     private static string Text(JsonElement message) =>
         message.TryGetProperty("content", out var c) && c.ValueKind == JsonValueKind.String
-            ? c.GetString() ?? string.Empty
+            ? ThinkBlock().Replace(c.GetString() ?? string.Empty, string.Empty).Trim()
             : string.Empty;
+
+    [GeneratedRegex(@"<think>.*?(</think>|$)", RegexOptions.Singleline | RegexOptions.IgnoreCase)]
+    private static partial Regex ThinkBlock();
 
     private string ModelOf(JsonElement root) =>
         root.TryGetProperty("model", out var m) ? m.GetString() ?? _options.Model : _options.Model;
