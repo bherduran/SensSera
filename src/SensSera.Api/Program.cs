@@ -95,16 +95,23 @@ builder.Services.AddAuthorization(options =>
 
         
 
-// Rate limiters: 100 req/min for ingest, 10 req/min for auth (brute force protection)
+// Rate limiters: 60 req/min per device for ingest, 10 req/min for auth (brute force protection)
+var ingestPermitLimit = builder.Configuration.GetValue("RateLimiting:IngestPermitLimit", 60);
 builder.Services.AddRateLimiter(options =>
 {
     // The middleware default is 503, which clients read as "server down" rather than "slow down".
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
-    options.AddFixedWindowLimiter("ingest", o =>
+    // Per device token, not one global bucket: the simulator's six devices alone send ~72 req/min,
+    // so a shared 100/min left no room for a real board. The device_id claim comes from the
+    // verified token; the IP fallback only covers requests that reach here unauthenticated.
+    options.AddPolicy("ingest", httpContext =>
     {
-        o.PermitLimit = 100;
-        o.Window = TimeSpan.FromMinutes(1);
+        var key = httpContext.User.FindFirst("device_id")?.Value is { } deviceId
+            ? $"device:{deviceId}"
+            : $"ip:{httpContext.Connection.RemoteIpAddress}";
+        return RateLimitPartition.GetFixedWindowLimiter(key, _ =>
+            new FixedWindowRateLimiterOptions { PermitLimit = ingestPermitLimit, Window = TimeSpan.FromMinutes(1) });
     });
     options.AddFixedWindowLimiter("auth", o=>
     {

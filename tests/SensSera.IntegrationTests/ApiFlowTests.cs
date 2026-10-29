@@ -112,6 +112,23 @@ public sealed class ApiFlowTests(SensSeraApiFactory factory)
     }
 
     [Fact]
+    public async Task Ingest_RateLimit_IsPerDevice()
+    {
+        var (client, _) = await RegisterAsync();
+        var greenhouseId = await CreateGreenhouseAsync(client);
+        var (_, noisyToken) = await CreateDeviceAsync(client, greenhouseId, "Temperature");
+        var (_, quietToken) = await CreateDeviceAsync(client, greenhouseId, "Humidity");
+        var now = DateTimeOffset.UtcNow.ToString("O");
+
+        // The factory sets the ingest limit to 5 per device per minute.
+        for (var i = 0; i < 5; i++)
+            (await IngestAsync(noisyToken, "Temperature", 20, now)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        (await IngestAsync(noisyToken, "Temperature", 20, now)).StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+        (await IngestAsync(quietToken, "Humidity", 50, now)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+    }
+
+    [Fact]
     public async Task OtherTenant_GetsNotFound_AndEmptyList()
     {
         var (orgA, _) = await RegisterAsync();
