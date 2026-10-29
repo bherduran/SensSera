@@ -19,6 +19,7 @@ public class AppDbContext : DbContext
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Greenhouse> Greenhouses => Set<Greenhouse>();
     public DbSet<Device> Devices => Set<Device>();
+    public DbSet<Node> Nodes => Set<Node>();
     public DbSet<SensorReading> SensorReadings => Set<SensorReading>();
     public DbSet<Threshold> Thresholds => Set<Threshold>();
     public DbSet<Alert> Alerts => Set<Alert>();
@@ -30,6 +31,7 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<Greenhouse>().HasQueryFilter(g => _tenant!.OrganizationId != null && g.OrganizationId == _tenant.OrganizationId);
         modelBuilder.Entity<Device>().HasQueryFilter(d => _tenant!.OrganizationId != null && d.OrganizationId == _tenant.OrganizationId);
+        modelBuilder.Entity<Node>().HasQueryFilter(n => _tenant!.OrganizationId != null && n.OrganizationId == _tenant.OrganizationId);
         modelBuilder.Entity<Threshold>().HasQueryFilter(t => _tenant!.OrganizationId != null && t.OrganizationId == _tenant.OrganizationId);
         modelBuilder.Entity<Alert>().HasQueryFilter(a => _tenant!.OrganizationId != null && a.OrganizationId == _tenant.OrganizationId);
         modelBuilder.Entity<SensorReading>().HasQueryFilter(s => _tenant!.OrganizationId != null && s.OrganizationId == _tenant.OrganizationId);
