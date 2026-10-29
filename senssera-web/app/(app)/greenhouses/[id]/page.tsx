@@ -43,6 +43,7 @@ import { DeviceTokenDialog } from "@/components/devices/device-token-dialog";
 import { GreenhouseMonitoring } from "@/components/greenhouses/greenhouse-monitoring";
 import { ThresholdsSection } from "@/components/thresholds/thresholds-section";
 import { SpecimenHeader } from "@/components/notebook/specimen-header";
+import { NodesSection } from "@/components/nodes/nodes-section";
 
 const DAY_MS = 86_400_000;
 
@@ -56,12 +57,14 @@ export default function GreenhouseDetailPage() {
   const [openedAt] = useState(() => Date.now());
   const devices = useDevices(id);
 
-  const [reveal, setReveal] = useState<{ token: string; name: string } | null>(
-    null,
-  );
+  const [reveal, setReveal] = useState<{
+    token: string;
+    name: string;
+    kind: "device" | "board";
+  } | null>(null);
 
   function onDeviceCreated(device: DeviceWithToken) {
-    setReveal({ token: device.token, name: device.name });
+    setReveal({ token: device.token, name: device.name, kind: "device" });
   }
 
   // Unknown id or another tenant's greenhouse: the API answers 404.
@@ -102,6 +105,12 @@ export default function GreenhouseDetailPage() {
       )}
 
       <GreenhouseMonitoring greenhouseId={id} />
+
+      <NodesSection
+        greenhouseId={id}
+        isAdmin={isAdmin}
+        onToken={(token, name) => setReveal({ token, name, kind: "board" })}
+      />
 
       <div className="flex items-end justify-between gap-4 border-b border-dashed pt-4 pb-2">
         <div>
@@ -166,7 +175,7 @@ export default function GreenhouseDetailPage() {
                   greenhouseId={id}
                   isAdmin={isAdmin}
                   onToken={(token) =>
-                    setReveal({ token, name: device.name })
+                    setReveal({ token, name: device.name, kind: "device" })
                   }
                 />
               ))}
@@ -180,6 +189,7 @@ export default function GreenhouseDetailPage() {
       <DeviceTokenDialog
         token={reveal?.token ?? null}
         deviceName={reveal?.name}
+        kind={reveal?.kind}
         onClose={() => setReveal(null)}
       />
     </div>
@@ -222,7 +232,14 @@ function DeviceRow({
 
   return (
     <TableRow>
-      <TableCell className="font-medium">{device.name}</TableCell>
+      <TableCell className="font-medium">
+        {device.name}
+        {device.channel && (
+          <span className="ml-2 font-mono text-xs font-normal text-muted-foreground">
+            board · {device.channel}
+          </span>
+        )}
+      </TableCell>
       <TableCell>
         <Badge variant="secondary" className="gap-1 font-normal">
           <MetricIcon className="h-3.5 w-3.5" />
@@ -244,32 +261,35 @@ function DeviceRow({
       {isAdmin && (
         <TableCell className="text-right">
           <div className="flex justify-end gap-1">
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Rotate token"
-                  disabled={rotate.isPending}
-                >
-                  <KeyRound className="h-4 w-4" />
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Rotate the token for “{device.name}”?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    A new token is issued and the current one stops working
-                    immediately. The device can&apos;t send readings until it is
-                    configured with the new token.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleRotate}>Rotate token</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            {/* Channel devices report through their board; the board's token is rotated instead. */}
+            {!device.channel && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Rotate token"
+                    disabled={rotate.isPending}
+                  >
+                    <KeyRound className="h-4 w-4" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Rotate the token for “{device.name}”?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      A new token is issued and the current one stops working
+                      immediately. The device can&apos;t send readings until it is
+                      configured with the new token.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleRotate}>Rotate token</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button

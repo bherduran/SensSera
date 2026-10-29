@@ -1032,6 +1032,230 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/nodes/greenhouse/{greenhouseId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    greenhouseId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["NodeResponse"][];
+                        "application/json": components["schemas"]["NodeResponse"][];
+                        "text/json": components["schemas"]["NodeResponse"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/nodes/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["NodeResponse"];
+                        "application/json": components["schemas"]["NodeResponse"];
+                        "text/json": components["schemas"]["NodeResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/nodes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["NodeRequest"];
+                    "text/json": components["schemas"]["NodeRequest"];
+                    "application/*+json": components["schemas"]["NodeRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["NodeWithTokenResponse"];
+                        "application/json": components["schemas"]["NodeWithTokenResponse"];
+                        "text/json": components["schemas"]["NodeWithTokenResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/nodes/{id}/rotate-token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["NodeWithTokenResponse"];
+                        "application/json": components["schemas"]["NodeWithTokenResponse"];
+                        "text/json": components["schemas"]["NodeWithTokenResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/nodes/{id}/channels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["NodeChannelRequest"];
+                    "text/json": components["schemas"]["NodeChannelRequest"];
+                    "application/*+json": components["schemas"]["NodeChannelRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/plain": components["schemas"]["NodeChannelResponse"];
+                        "application/json": components["schemas"]["NodeChannelResponse"];
+                        "text/json": components["schemas"]["NodeChannelResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/thresholds/greenhouse/{greenhouseId}": {
         parameters: {
             query?: never;
@@ -1268,10 +1492,14 @@ export interface components {
             /** Format: uuid */
             greenhouseId: string;
             metric: components["schemas"]["MetricType"];
-            status: string;
+            status: components["schemas"]["DeviceStatus"];
             /** Format: date-time */
             createdAt: string;
+            /** Format: uuid */
+            nodeId: null | string;
+            channel: null | string;
         };
+        DeviceStatus: number;
         DeviceWithTokenResponse: {
             /** Format: uuid */
             id: string;
@@ -1327,6 +1555,7 @@ export interface components {
             value: number | string;
             /** Format: date-time */
             recordedAt: string;
+            channel?: null | string;
         };
         LoginRequest: {
             email: string;
@@ -1363,6 +1592,48 @@ export interface components {
             avg24h: number | string;
         };
         MetricType: number;
+        NodeChannelRequest: {
+            channel: string;
+            name: string;
+            metric: components["schemas"]["MetricType"];
+        };
+        NodeChannelResponse: {
+            /** Format: uuid */
+            deviceId: string;
+            channel: string;
+            name: string;
+            metric: components["schemas"]["MetricType"];
+            /** Format: date-time */
+            lastSeenAt: null | string;
+        };
+        NodeRequest: {
+            name: string;
+            /** Format: uuid */
+            greenhouseId: string;
+        };
+        NodeResponse: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** Format: uuid */
+            greenhouseId: string;
+            firmwareVersion: null | string;
+            /** Format: date-time */
+            lastSeenAt: null | string;
+            status: components["schemas"]["NodeStatus"];
+            /** Format: date-time */
+            createdAt: string;
+            channels: components["schemas"]["NodeChannelResponse"][];
+        };
+        NodeStatus: number;
+        NodeWithTokenResponse: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /** Format: uuid */
+            greenhouseId: string;
+            token: string;
+        };
         PagedResponseOfAlertResponse: {
             items: components["schemas"]["AlertResponse"][];
             /** Format: int32 */

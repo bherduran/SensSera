@@ -15,10 +15,12 @@ import { Button } from "@/components/ui/button";
 export function DeviceTokenDialog({
   token,
   deviceName,
+  kind = "device",
   onClose,
 }: {
   token: string | null;
   deviceName?: string;
+  kind?: "device" | "board";
   onClose: () => void;
 }) {
   const [copied, setCopied] = useState(false);
@@ -43,7 +45,8 @@ export function DeviceTokenDialog({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>
-            Device token{deviceName ? ` — ${deviceName}` : ""}
+            {kind === "board" ? "Board" : "Device"} token
+            {deviceName ? ` — ${deviceName}` : ""}
           </DialogTitle>
           <DialogDescription>
             Copy this token now. For security it is shown only once and cannot be
@@ -54,8 +57,10 @@ export function DeviceTokenDialog({
         <div className="flex items-start gap-2 border-l-2 border-alert bg-alert/[0.07] px-3 py-2.5 text-sm">
           <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-alert-text" />
           <span className="text-foreground/80">
-            Paste it into your device / simulator config. If it&apos;s lost, rotate
-            the token to issue a new one.
+            {kind === "board"
+              ? "Enter it on the board during setup."
+              : "Paste it into your device / simulator config."}{" "}
+            If it&apos;s lost, rotate the token to issue a new one.
           </span>
         </div>
 
