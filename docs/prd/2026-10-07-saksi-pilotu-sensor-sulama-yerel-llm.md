@@ -58,13 +58,13 @@ SensSera bugün simülatörden gelen veriyle çalışıyor ve LLM yalnızca alar
 
 ### 5.1 Kart seçimi
 
-"Arduino" olarak **ESP32 DevKit (ESP32-WROOM-32)** kullanılır. Arduino IDE veya PlatformIO ile, Arduino çatısıyla programlanır. Klasik Arduino Uno'nun Wi-Fi'ı yok; ek modülle uğraşmak yerine Wi-Fi'ı dahili ESP32 seçilir.
+"Arduino" olarak **ESP32-S3 DevKitC (N16R8: 16 MB flash, 8 MB PSRAM)** kullanılır. PlatformIO ile, Arduino çatısıyla programlanır. Klasik Arduino Uno'nun Wi-Fi'ı yok; ek modülle uğraşmak yerine Wi-Fi'ı dahili ESP32 seçilir. S3, ilk plandaki WROOM-32'ye göre daha fazla bellek ve yerel USB sunar; yerel USB, firmware'in tarayıcıdan sürücüsüz yüklenmesini sağlar (§6). Kart yalnızca 2,4 GHz Wi-Fi'a bağlanır.
 
 ### 5.2 Malzeme listesi (3 saksı için)
 
 | Parça | Adet | Not |
 | --- | --- | --- |
-| ESP32 DevKit V1 (WROOM-32) | 1 (+1 yedek) | Wi-Fi dahili, Arduino çatısıyla programlanır |
+| ESP32-S3 DevKitC N16R8 (pin başlıkları lehimli) | 1 | Wi-Fi dahili, Arduino çatısıyla programlanır |
 | Kapasitif toprak nem sensörü v1.2 | 3 (+1 yedek) | Rezistif (FC-28 gibi) değil: rezistif problar toprakta korozyona uğrar. Ucuz v1.2 kartların bir kısmı hatalı çıkabiliyor, yedek alıp kalibrasyonda test et |
 | DHT22 (AM2302) sıcaklık/nem | 1 | Hava sıcaklığı ve nemi. Daha hassası istenirse SHT31 (I²C) |
 | BH1750 ışık sensörü | 1 | I²C, lux cinsinden; mevcut `Light` metriğinin 0–100.000 aralığına uyar |
@@ -74,7 +74,9 @@ SensSera bugün simülatörden gelen veriyle çalışıyor ve LLM yalnızca alar
 | Şamandıra şalter (float switch) | 1 | Depo boşken pompayı kilitler |
 | Su deposu (bidon, 5 L civarı) | 1 | |
 | 5 V 2 A adaptör + DC jak | 1 | Pompalar ve röle; geliştirmede ESP32 USB'den beslenebilir |
-| Breadboard, jumper kablo, klemens | 1 set | Pilot sonrası delikli plakete geçilir |
+| Breadboard, jumper kablo | 1 set | Tezgah testi için |
+| Delikli plaket, erkek pin başlıkları, makaron | 1 set | Kalıcı düzenek lehimlenir; sensörler pin başlığıyla takılıp çıkarılabilir kalır |
+| Kablo rakoru (PG7/PG9) | 4–6 | Kabloların buata su geçirmeden girmesi için |
 | Su geçirmez buat (IP65) | 1 | Elektronik saksıların yanında, su sıçramasına karşı |
 | Ölçü kabı | 1 | Pompa debisini ölçmek için |
 
@@ -82,13 +84,15 @@ Deney karşılaştırması (§12) için üç saksıda **aynı bitki türü, ayn�
 
 ### 5.3 Pin planı
 
-| Bağlantı | ESP32 pini | Gerekçe |
+| Bağlantı | ESP32-S3 pini | Gerekçe |
 | --- | --- | --- |
-| Nem sensörü 1 / 2 / 3 | GPIO34 / GPIO35 / GPIO32 | ADC1 pinleri; ADC2 Wi-Fi açıkken kullanılamaz |
-| DHT22 veri | GPIO4 | 10 kΩ pull-up (çoğu modülde hazır) |
-| BH1750 SDA / SCL | GPIO21 / GPIO22 | Varsayılan I²C |
-| Şamandıra şalter | GPIO33 | `INPUT_PULLUP` |
-| Röle 1 / 2 / 3 (pompalar) | GPIO25 / GPIO26 / GPIO27 | Açılış (strapping) pinleri olan GPIO0, 2, 12 ve 15'ten kaçınılır; açılışta pompa tetiklenmez |
+| Nem sensörü 1 / 2 / 3 (yedek: 4) | GPIO4 / GPIO5 / GPIO6 (GPIO7) | ADC1 pinleri (S3'te GPIO1–10); ADC2 Wi-Fi açıkken kullanılamaz |
+| DHT22 veri | GPIO16 | 10 kΩ pull-up (çoğu modülde hazır) |
+| BH1750 SDA / SCL | GPIO8 / GPIO9 | S3 DevKitC'nin Arduino'daki varsayılan I²C pinleri |
+| Şamandıra şalter | GPIO17 | `INPUT_PULLUP`; LOW = depo boş (kalibrasyonda doğrulanır) |
+| Röle 1 / 2 / 3 (pompalar) | GPIO11 / GPIO12 / GPIO13 | Strapping pinlerinden (GPIO0, 3, 45, 46) kaçınılır; açılışta pompa tetiklenmez |
+
+Kaçınılan pinler: GPIO19/20 (yerel USB), GPIO26–32 (flash), GPIO35–37 (N16R8'de sekizli PSRAM), GPIO48 (kart üstü RGB LED). İlk plandaki WROOM-32 pinleri (GPIO34/35 gibi) S3'te ya yok ya da PSRAM'e ayrılmış durumda.
 
 Sensörler 3,3 V ile beslenir; böylece analog çıkış ADC aralığında kalır. Pompa ve röle 5 V hattındadır, toprak hattı (GND) ESP32 ile ortaktır. Bazı 5 V röle modülleri 3,3 V mantıkla güvenilir tetiklenmez; modül alınırken bu kontrol edilmeli, sorun çıkarsa MOSFET'e geçilmeli.
 
@@ -108,6 +112,7 @@ Her nem sensörü için iki ham değer kaydedilir: havada (kuru) ve suda (ıslak
 - **Kontrol modları:** Saksının modu `Rule` ise kart kendi kararını verir. `Llm` veya `Manual` ise yalnızca sunucudan gelen komutları uygular. Sunucuya 15 dk ulaşılamazsa `Llm` modundaki saksılar yerel `Rule` moduna düşer ve bağlantı gelince geri döner.
 - **Güvenlik:** Açılışta tüm röleler kapalı konuma çekilir. Watchdog etkin. Yerel ağdaki demo HTTP kullanır; buluta bağlanırken HTTPS ve sunucunun kök sertifikası gömülür (`setInsecure` yalnızca tezgah testinde).
 - **Sürüm:** Firmware sürümü her ayar isteğinde gönderilir ve panoda görünür.
+- **Uzaktan bakım:** Düzenek, geliştiricinin erişemediği bir evde çalışır (§13). Bu yüzden ayarların tamamı sunucudan gelir ve yeniden yükleme gerektirmez; yeniden yükleme yalnızca firmware mantığı değiştiğinde gerekir. CI her sürümde `.bin` üretir; web uygulamasındaki kurulum sayfası (ESP Web Tools) firmware'i tarayıcıdan USB ile yükler ve Wi-Fi ile kart tokenını aynı sayfadan NVS'e yazar. Yükleme flash'ı silmez, böylece Wi-Fi ve token korunur. Kart kendi kendine güncelleme (OTA) yalnızca ihtiyaç olursa Faz 2'de ve imza doğrulamasıyla eklenir.
 
 ## 7. Backend değişiklikleri
 
@@ -358,7 +363,7 @@ Danışman "eğitim"le LLM'in kendisini kastediyorsa: deney boyunca biriken kara
 | --- | --- | --- | --- | --- |
 | Yerel demo | Masaüstü PC: `docker compose` (db, api, web) + host'ta Ollama | Ollama | ESP32 → `http://<PC-LAN-IP>:5010` | Bitirme sunumu ve saksı denemesi |
 | Bulut | Azure App Service + Vercel (bugünkü kurulum) | Groq | Simülatör (+ isteğe bağlı HTTPS'li gerçek kart) | Portföy demosu |
-| İzmir dönemi (12 Kas – 12 Ara) | Azure App Service + Vercel | Groq (geliştirme sırasında Mac'te Ollama) | ESP32 → Azure, HTTPS | Veri toplama ve kural modunda sulama; kart laptopun açık kalmasına bağlı değil |
+| Uzak dönem (12 Kas – 12 Ara) | Azure App Service + Vercel | Groq (geliştirme sırasında Mac'te Ollama) | ESP32 → Azure, HTTPS | Düzenek bir arkadaşın evinde, geliştirici İzmir'de. Veri toplama ve kural modunda sulama; hiçbir bilgisayarın açık kalmasına bağlı değil. Yerinde işler (depo, bağlantı, firmware yükleme) arkadaş tarafından yapılır |
 
 Azure'daki API, PC'deki Ollama'ya erişemez; LLM kararlı sulama bu yüzden yerel modda çalışır. Compose'a `api` servisi için `extra_hosts: host.docker.internal:host-gateway` eklenir. Simülatör yerel modda isteğe bağlı profile alınır, böylece gerçek veriyle karışmaz. Deney boyunca PC'nin açık kalması gerekir; PC kapanırsa kartlar 15 dk sonra yerel kural moduna geçer.
 
@@ -379,12 +384,12 @@ Azure'daki API, PC'deki Ollama'ya erişemez; LLM kararlı sulama bu yüzden yere
 
 ## 15. Fazlar
 
-Takvim tek döneme sığar: teslim Ocak 2027 başı. 12 Kasım – 12 Aralık arası düzenek İzmir'de çalışır (§13), bu yüzden veri toplamayı başlatan işler bu tarihten önce biter. Donanımdan bağımsız işler (politika katmanı, açık veriyle tahmin modeli, karar ajanı) İzmir'de laptoptan sürer.
+Takvim tek döneme sığar: teslim Ocak 2027 başı. 12 Kasım – 12 Aralık arası düzenek bir arkadaşın evinde, geliştiricinin uzağında çalışır (§13); 12 Aralık civarında saksılar geliştiricinin evine taşınır. Bu yüzden veri toplamayı başlatan işler 12 Kasım'dan önce biter. Donanımdan bağımsız işler (politika katmanı, açık veriyle tahmin modeli, karar ajanı) İzmir'de laptoptan sürer.
 
 | Faz | Hedef tarih | İçerik | Bitti sayılır |
 | --- | --- | --- | --- |
 | 0 — Tezgah testi | 29 Eki – 7 Kas | Parça siparişi (bu hafta); tek nem sensörü + ESP32; kalibrasyon; mevcut `/api/ingest`'e mevcut cihaz tokenıyla POST | Panoda gerçek nem verisi görünüyor; backend değişikliği yok |
-| 1 — İzleme ve veri toplama | 29 Eki – 15 Kas | `Node` + kanal modeli, toplu gönderim, NTP, tampon, rate limit düzeltmesi; `OpenAiCompatibleLlmClient` + Ollama; kart HTTPS ile Azure'a gönderir; İzmir'de 3 saksı kurulur ve **veri toplama başlar** (elle sulama kaydıyla) | 3 saksı 48 saat kesintisiz; "Açıkla" yerel modelle çalışıyor |
+| 1 — İzleme ve veri toplama | 29 Eki – 15 Kas | `Node` + kanal modeli, toplu gönderim, NTP, tampon, rate limit düzeltmesi; `OpenAiCompatibleLlmClient` + Ollama; kart HTTPS ile Azure'a gönderir; 3 saksı arkadaşın evinde kurulur ve **veri toplama başlar** (elle sulama; sulama anları nemdeki sıçramadan çıkarılır); tarayıcıdan firmware kurulum sayfası | 3 saksı 48 saat kesintisiz; "Açıkla" yerel modelle çalışıyor |
 | 2 — Sulama ve politika | 15 – 30 Kas | Pompa, röle, şamandıra; `Zone`, karar/komut/olay modeli; politika katmanı; ayar ve olay uç noktaları; kural motoru; firmware güvenlik katmanı | Kural modunda otomatik ve manuel sulama çalışıyor; tüm engel durumları test edildi |
 | 3 — Tahmin modeli | Kasım (açık veri) – 12 Ara (kendi veri) | Açık veriyle yöntem geliştirme donanım beklemeden başlar; kendi verimizle eğitim; ONNX entegrasyonu; `ForecastJob` | Tahmin panoda; MAE raporlandı |
 | 4 — LLM karar ajanı ve notlar | 1 – 14 Ara | Karar ajanı, öneri notları, değerlendirme setleri, arayüz | Karar ve soru setleri üç yapılandırmada çalıştırıldı |
@@ -418,9 +423,10 @@ Bahar dönemindeki zorunlu staj nedeniyle geliştirme Ocak ortasında kapanır. 
 | LLM gerekçede sayı uydurur | Gerekçedeki sayılar araç çıktısıyla otomatik karşılaştırılır; eşleşmeyen gerekçe işaretlenir |
 | Öneri notları gereksiz veya tekrarlı olur | Konu başına tek açık not, günlük üst sınır, kullanıcı geri bildirimi (kabul/ret) |
 | Kendi verimiz model eğitmeye yetmez | Veri toplamanın Faz 1'de başlaması; açık veriyle ön eğitim; taban modelle dürüst karşılaştırma |
-| Parçalar İzmir'e gidişten önce gelmez | Sipariş Faz 0'ın ilk haftasında; gecikirse parçalar doğrudan İzmir adresine sipariş edilir, tezgah testi orada yapılır |
-| Azure ücretsiz katmanı gerçek kartın sürekli gönderimine yetmez (CPU kotası, uyku) | Gerçek kart bağlanınca kota izlenir; gerekirse ölçüm aralığı büyütülür veya İzmir döneminde Mac'te yerel mod kullanılır |
-| Düzenek İzmir'den eve taşınırken bitkiler etkilenir | Deney eve dönüşten sonra yeni bir uyum süresiyle başlar; İzmir verisi yalnızca model eğitiminde kullanılır |
+| Parçalar 12 Kasım'dan önce gelmez | Firmware ve kurulum sayfası donanımsız yazılıp derlenir; parçalar gelince kurulum arkadaş tarafından yapılır, tezgah testi uzaktan (pano + görüntülü görüşme) izlenir |
+| Geliştirici düzeneğe uzaktan erişemez | Ayarlar sunucudan; firmware tarayıcıdan yüklenir; sürüm panoda doğrulanır; kart çevrimdışı uyarısı; Faz 2 pompa testleri boş saksıda ve görüntülü görüşmeyle |
+| Azure ücretsiz katmanı gerçek kartın sürekli gönderimine yetmez (CPU kotası, uyku) | Gerçek kart bağlanınca kota izlenir; gerekirse ölçüm aralığı büyütülür veya B1 katmanına geçilir (öğrenci kredisiyle) |
+| Düzenek arkadaşın evinden geliştiricinin evine taşınırken bitkiler etkilenir | Deney taşımadan sonra yeni bir uyum süresiyle başlar; uzak dönem verisi yalnızca model eğitiminde kullanılır |
 | Açık verinin koşulları saksıdan farklı | Aktarım performansı ayrıca raporlanır; ana test her zaman kendi verimizde |
 | Hatalı veya tutarsız nem sensörü | Yedek sensör; kanal bazında kalibrasyon; sabit değer ve ani sıçrama için sensör notu |
 | Su elektronikle temas eder | Elektronik buatta ve saksı seviyesinin üstünde; hortum bağlantıları kelepçeli; ilk testler boş saksıda |
