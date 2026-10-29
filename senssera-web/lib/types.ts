@@ -40,6 +40,24 @@ export type DeviceWithToken = Omit<Schemas["DeviceWithTokenResponse"], "metric">
   metric: Metric;
 };
 
+// Boards (ESP32) that report several sensors over one token. Status is derived
+// server-side from lastSeenAt, so it is current on every fetch.
+export const NODE_STATUSES = ["neverSeen", "online", "offline"] as const;
+export type NodeStatus = (typeof NODE_STATUSES)[number];
+
+export type NodeChannel = Omit<Schemas["NodeChannelResponse"], "metric"> & {
+  metric: Metric;
+};
+export type Node = Omit<Schemas["NodeResponse"], "status" | "channels"> & {
+  status: NodeStatus;
+  channels: NodeChannel[];
+};
+export type NodeInput = Schemas["NodeRequest"];
+export type NodeWithToken = Schemas["NodeWithTokenResponse"];
+export type NodeChannelInput = Omit<Schemas["NodeChannelRequest"], "metric"> & {
+  metric: Metric;
+};
+
 // Alert enums serialize camelCase (JsonStringEnumConverter), mirroring the backend enums.
 export const ALERT_SEVERITIES = ["warning", "critical"] as const;
 export type AlertSeverity = (typeof ALERT_SEVERITIES)[number];
