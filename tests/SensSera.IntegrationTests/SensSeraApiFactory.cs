@@ -34,6 +34,8 @@ public sealed class SensSeraApiFactory : WebApplicationFactory<Program>, IAsyncL
         builder.UseSetting("Jobs:ThresholdEvaluationIntervalSeconds", "1");
         // Every test registers its own org; the production 10/min auth limit would throttle the suite.
         builder.UseSetting("RateLimiting:AuthPermitLimit", "1000");
+        // Low enough to hit in a test; every test ingests through its own fresh device, well under this.
+        builder.UseSetting("RateLimiting:IngestPermitLimit", "5");
     }
 }
 
