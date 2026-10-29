@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using Microsoft.EntityFrameworkCore;
 using SensSera.Application.DTOs;
 using SensSera.Application.Interfaces;
@@ -51,7 +50,7 @@ public sealed class DeviceService(AppDbContext db, ITenantContext tenant, TimePr
         db.Devices.Add(device);
         await db.SaveChangesAsync(cancellationToken);
 
-        var (rawToken, tokenHash) = GenerateToken(device.Id);
+        var (rawToken, tokenHash) = TokenGenerator.Create(device.Id);
         device.DeviceTokenHash = tokenHash;
         await db.SaveChangesAsync(cancellationToken);
 
@@ -68,6 +67,10 @@ public sealed class DeviceService(AppDbContext db, ITenantContext tenant, TimePr
             ?? throw new KeyNotFoundException($"Device {id} not found");
 
         await VerifyGreenhouseOwnershipAsync(request.GreenhouseId, cancellationToken);
+
+        // A channel lives on a board, and the board sits in one greenhouse.
+        if (d.NodeId is not null && request.GreenhouseId != d.GreenhouseId)
+            throw new ArgumentException("A node channel cannot move to another greenhouse; move or recreate the node instead.");
 
         d.Name = request.Name;
         d.GreenhouseId = request.GreenhouseId;
@@ -104,7 +107,11 @@ public sealed class DeviceService(AppDbContext db, ITenantContext tenant, TimePr
             .FirstOrDefaultAsync(cancellationToken)
             ?? throw new KeyNotFoundException($"Device {id} not found");
 
-        var (rawToken, tokenHash) = GenerateToken(d.Id);
+        // A channel device's own token is never accepted, so handing one out would only mislead.
+        if (d.NodeId is not null)
+            throw new ArgumentException("This device is a node channel; rotate the node's token instead.");
+
+        var (rawToken, tokenHash) = TokenGenerator.Create(d.Id);
         d.DeviceTokenHash = tokenHash;
         d.UpdatedAt = timeProvider.GetUtcNow().UtcDateTime;
 
@@ -122,14 +129,6 @@ public sealed class DeviceService(AppDbContext db, ITenantContext tenant, TimePr
             throw new KeyNotFoundException($"Greenhouse {greenhouseId} not found");
     }
     
-    private static (string rawToken, string tokenHash) GenerateToken(Guid deviceId)
-    {
-        var secret = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
-        var raw = $"{deviceId}.{secret}";
-        var hash = Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(secret)));
-        return (raw, hash);
-    }
-
     private static DeviceResponse ToResponse(Device d) =>
-        new(d.Id, d.Name, d.GreenhouseId, d.Metric, d.Status, d.CreatedAt);
+        new(d.Id, d.Name, d.GreenhouseId, d.Metric, d.Status, d.CreatedAt, d.NodeId, d.Channel);
 }

@@ -151,6 +151,7 @@ builder.Services.AddFluentValidationAutoValidation();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ITenantContext, TenantContext>();
 builder.Services.AddScoped<IDeviceService, DeviceService>();
+builder.Services.AddScoped<INodeService, NodeService>();
 builder.Services.AddScoped<IGreenhouseService, GreenhouseService>();
 builder.Services.AddScoped<IIngestionService, IngestionService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
