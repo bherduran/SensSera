@@ -17,7 +17,7 @@ namespace SensSera.Infrastructure.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.12")
+                .HasAnnotation("ProductVersion", "10.0.14")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -86,6 +86,10 @@ namespace SensSera.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Channel")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -107,6 +111,9 @@ namespace SensSera.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<Guid?>("NodeId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid");
 
@@ -120,7 +127,13 @@ namespace SensSera.Infrastructure.Migrations
 
                     b.HasIndex("GreenhouseId");
 
-                    b.ToTable("Devices");
+                    b.HasIndex("NodeId", "Channel")
+                        .IsUnique();
+
+                    b.ToTable("Devices", t =>
+                        {
+                            t.HasCheckConstraint("CK_Devices_NodeChannel", "(\"NodeId\" IS NULL) = (\"Channel\" IS NULL)");
+                        });
                 });
 
             modelBuilder.Entity("SensSera.Domain.Entities.Greenhouse", b =>
@@ -157,6 +170,47 @@ namespace SensSera.Infrastructure.Migrations
                     b.HasIndex("OrganizationId");
 
                     b.ToTable("Greenhouses");
+                });
+
+            modelBuilder.Entity("SensSera.Domain.Entities.Node", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FirmwareVersion")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<Guid>("GreenhouseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("LastSeenAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GreenhouseId");
+
+                    b.ToTable("Nodes");
                 });
 
             modelBuilder.Entity("SensSera.Domain.Entities.Organization", b =>
@@ -419,7 +473,14 @@ namespace SensSera.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("SensSera.Domain.Entities.Node", "Node")
+                        .WithMany("Devices")
+                        .HasForeignKey("NodeId")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.Navigation("Greenhouse");
+
+                    b.Navigation("Node");
                 });
 
             modelBuilder.Entity("SensSera.Domain.Entities.Greenhouse", b =>
@@ -431,6 +492,17 @@ namespace SensSera.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Organization");
+                });
+
+            modelBuilder.Entity("SensSera.Domain.Entities.Node", b =>
+                {
+                    b.HasOne("SensSera.Domain.Entities.Greenhouse", "Greenhouse")
+                        .WithMany("Nodes")
+                        .HasForeignKey("GreenhouseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Greenhouse");
                 });
 
             modelBuilder.Entity("SensSera.Domain.Entities.ReadingRollup", b =>
@@ -501,7 +573,14 @@ namespace SensSera.Infrastructure.Migrations
 
                     b.Navigation("Devices");
 
+                    b.Navigation("Nodes");
+
                     b.Navigation("Thresholds");
+                });
+
+            modelBuilder.Entity("SensSera.Domain.Entities.Node", b =>
+                {
+                    b.Navigation("Devices");
                 });
 
             modelBuilder.Entity("SensSera.Domain.Entities.Organization", b =>

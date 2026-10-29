@@ -11,6 +11,7 @@ public class Greenhouse : BaseEntity
     public string? CropType { get; set; }
     public Organization Organization { get; set; } = null!;
     public ICollection<Device> Devices { get; set; } = [];
+    public ICollection<Node> Nodes { get; set; } = [];
     public ICollection<Threshold> Thresholds { get; set; } = [];
     public ICollection<Alert> Alerts { get; set; } = [];
    
