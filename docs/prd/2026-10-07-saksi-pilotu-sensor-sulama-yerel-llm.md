@@ -161,7 +161,7 @@ MQTT bilinçli olarak ilk aşamaya alınmadı: HTTP ile ayar sorgulama, bir brok
 | `IrrigationDecisionJob` (yeni) | 30 dk'da bir + tetiklemeli | `Llm` modundaki saksılar için karar ajanını çalıştırır (§9.3). Nem bandın alt sınırına yaklaştığında veya tahmin 2 saat içinde eşiğin altına düşüleceğini söylediğinde döngüyü beklemeden tetiklenir |
 | `RecommendationJob` (yeni) | Günde bir (akşam) + olay tetiklemeli | Günün özetini ve öneri notlarını üretir (§9.4). Depo boşalması, sensör anomalisi ve art arda reddedilen kararlar anlık not tetikler |
 | `ForecastJob` (yeni) | Saatte bir | Her saksı için tahmin üretir, `ForecastLog`'a yazar, süresi dolan tahminlerin gerçek değerini doldurur |
-| `DeviceHeartbeatJob` (değişir) | Dakikada bir | Node'ları da 5 dk sessizlikte çevrimdışı işaretler |
+| `DeviceHeartbeatJob` (değişmez) | Dakikada bir | Kanal cihazlarını 5 dk sessizlikte çevrimdışı işaretler. Node durumu saklanmaz; her okumada `LastSeenAt`'ten hesaplanır (`NeverSeen` / `Online` / `Offline`) |
 
 Depo boşalması ve çevrimdışı kart mevcut alarm akışından uyarı üretir. Yeni SignalR olayları: `DecisionMade`, `IrrigationStarted`, `IrrigationCompleted`, `NoteCreated`, `NodeStatusChanged`.
 
