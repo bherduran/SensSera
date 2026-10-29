@@ -324,7 +324,9 @@ Değerlendirme zaman bazlı bölmeyle yapılır: geçmişle eğitilir, sonraki g
 
 Eğitim Python'da (pandas, scikit-learn, LightGBM, Jupyter) yapılır ve repoda `ml/` klasöründe tekrar üretilebilir not defterleri olarak tutulur. Model ONNX'e aktarılır ve .NET API içinde ONNX Runtime ile çalıştırılır. Ayrı bir Python servisi işletmeye gerek kalmaz. Model sürümü `ForecastLog.ModelVersion` ile izlenir.
 
-### 10.6 LLM ince ayarı (isteğe bağlı, zaman kalırsa)
+### 10.6 LLM ince ayarı (kapsam dışı, gelecek çalışma)
+
+Tek dönemlik takvimde (§15) bu adıma yer yoktur; aşağıdaki plan tezde gelecek çalışma olarak anlatılır.
 
 Danışman "eğitim"le LLM'in kendisini kastediyorsa: deney boyunca biriken karar kayıtları ve gerekçeler, doğru aksiyonlarla etiketlenip küçük bir talimat veri setine dönüştürülür. `qwen3:4b` bu veriyle LoRA ince ayarından geçirilir (8 GB VRAM'e uygun boyut) ve Ollama'ya aktarılır. Etkisi §9.6'daki karar setinde, ince ayarsız modelle karşılaştırılarak ölçülür. Bu adım ana kapsamın dışındadır; tahmin modeli tamamlanmadan başlanmaz.
 
@@ -348,7 +350,7 @@ Danışman "eğitim"le LLM'in kendisini kastediyorsa: deney boyunca biriken kara
 | B | LLM + tahmin modeli | Önerilen sistem |
 | C | LLM, tahmin aracı kapalı | Tahmin modelinin katkısını ayırmak |
 
-İlk 2 hafta sonunda modlar saksılar arasında döndürülür ve 2 hafta daha çalıştırılır; böylece saksının konumundan (ışık, sıcaklık) gelen fark sonuçlara karışmaz. Karşılaştırılanlar: bant içinde geçen süre, kullanılan toplam su, sulama sayısı, politika tarafından kırpılan/reddedilen karar sayısı ve öneri notlarının kabul oranı.
+İlk hafta sonunda modlar saksılar arasında döndürülür ve 1 hafta daha çalıştırılır (takvim tek döneme sığsın diye 2 + 2 haftadan kısaltıldı; süre kısalığı tezde sınırlılık olarak belirtilir); böylece saksının konumundan (ışık, sıcaklık) gelen fark sonuçlara karışmaz. Karşılaştırılanlar: bant içinde geçen süre, kullanılan toplam su, sulama sayısı, politika tarafından kırpılan/reddedilen karar sayısı ve öneri notlarının kabul oranı.
 
 ## 13. Dağıtım modları
 
@@ -356,6 +358,7 @@ Danışman "eğitim"le LLM'in kendisini kastediyorsa: deney boyunca biriken kara
 | --- | --- | --- | --- | --- |
 | Yerel demo | Masaüstü PC: `docker compose` (db, api, web) + host'ta Ollama | Ollama | ESP32 → `http://<PC-LAN-IP>:5010` | Bitirme sunumu ve saksı denemesi |
 | Bulut | Azure App Service + Vercel (bugünkü kurulum) | Groq | Simülatör (+ isteğe bağlı HTTPS'li gerçek kart) | Portföy demosu |
+| İzmir dönemi (12 Kas – 12 Ara) | Azure App Service + Vercel | Groq (geliştirme sırasında Mac'te Ollama) | ESP32 → Azure, HTTPS | Veri toplama ve kural modunda sulama; kart laptopun açık kalmasına bağlı değil |
 
 Azure'daki API, PC'deki Ollama'ya erişemez; LLM kararlı sulama bu yüzden yerel modda çalışır. Compose'a `api` servisi için `extra_hosts: host.docker.internal:host-gateway` eklenir. Simülatör yerel modda isteğe bağlı profile alınır, böylece gerçek veriyle karışmaz. Deney boyunca PC'nin açık kalması gerekir; PC kapanırsa kartlar 15 dk sonra yerel kural moduna geçer.
 
@@ -376,15 +379,19 @@ Azure'daki API, PC'deki Ollama'ya erişemez; LLM kararlı sulama bu yüzden yere
 
 ## 15. Fazlar
 
+Takvim tek döneme sığar: teslim Ocak 2027 başı. 12 Kasım – 12 Aralık arası düzenek İzmir'de çalışır (§13), bu yüzden veri toplamayı başlatan işler bu tarihten önce biter. Donanımdan bağımsız işler (politika katmanı, açık veriyle tahmin modeli, karar ajanı) İzmir'de laptoptan sürer.
+
 | Faz | Hedef tarih | İçerik | Bitti sayılır |
 | --- | --- | --- | --- |
-| 0 — Tezgah testi | Ekim sonu | Parça alımı; tek nem sensörü + ESP32; kalibrasyon; mevcut `/api/ingest`'e mevcut cihaz tokenıyla POST | Panoda gerçek nem verisi görünüyor; backend değişikliği yok |
-| 1 — İzleme ve veri toplama | Kasım | `Node` + kanal modeli, toplu gönderim, NTP, tampon, rate limit düzeltmesi; `OpenAiCompatibleLlmClient` + Ollama; 3 saksı kurulur ve **veri toplama başlar** (elle sulama kaydıyla) | 3 saksı 48 saat kesintisiz; "Açıkla" yerel modelle çalışıyor |
-| 2 — Sulama ve politika | Kasım sonu – Aralık başı | Pompa, röle, şamandıra; `Zone`, karar/komut/olay modeli; politika katmanı; ayar ve olay uç noktaları; kural motoru; firmware güvenlik katmanı | Kural modunda otomatik ve manuel sulama çalışıyor; tüm engel durumları test edildi |
-| 3 — Tahmin modeli | Aralık | Açık veriyle yöntem geliştirme; kendi verimizle eğitim; ONNX entegrasyonu; `ForecastJob` | Tahmin panoda; MAE raporlandı |
-| 4 — LLM karar ajanı ve notlar | Aralık sonu – Ocak başı | Karar ajanı, öneri notları, değerlendirme setleri, arayüz | Karar ve soru setleri üç yapılandırmada çalıştırıldı |
-| 5 — Deney | Ocak ortası – Şubat ortası | 2 + 2 haftalık karşılaştırmalı deney (§12) | §14 ölçütleri raporlandı |
-| 6 — İsteğe bağlı | Zaman kalırsa | LLM LoRA ince ayarı (§10.6) | İnce ayarlı ve ayarsız model karşılaştırıldı |
+| 0 — Tezgah testi | 29 Eki – 7 Kas | Parça siparişi (bu hafta); tek nem sensörü + ESP32; kalibrasyon; mevcut `/api/ingest`'e mevcut cihaz tokenıyla POST | Panoda gerçek nem verisi görünüyor; backend değişikliği yok |
+| 1 — İzleme ve veri toplama | 29 Eki – 15 Kas | `Node` + kanal modeli, toplu gönderim, NTP, tampon, rate limit düzeltmesi; `OpenAiCompatibleLlmClient` + Ollama; kart HTTPS ile Azure'a gönderir; İzmir'de 3 saksı kurulur ve **veri toplama başlar** (elle sulama kaydıyla) | 3 saksı 48 saat kesintisiz; "Açıkla" yerel modelle çalışıyor |
+| 2 — Sulama ve politika | 15 – 30 Kas | Pompa, röle, şamandıra; `Zone`, karar/komut/olay modeli; politika katmanı; ayar ve olay uç noktaları; kural motoru; firmware güvenlik katmanı | Kural modunda otomatik ve manuel sulama çalışıyor; tüm engel durumları test edildi |
+| 3 — Tahmin modeli | Kasım (açık veri) – 12 Ara (kendi veri) | Açık veriyle yöntem geliştirme donanım beklemeden başlar; kendi verimizle eğitim; ONNX entegrasyonu; `ForecastJob` | Tahmin panoda; MAE raporlandı |
+| 4 — LLM karar ajanı ve notlar | 1 – 14 Ara | Karar ajanı, öneri notları, değerlendirme setleri, arayüz | Karar ve soru setleri üç yapılandırmada çalıştırıldı |
+| 5 — Deney | 15 – 28 Ara | 1 + 1 haftalık karşılaştırmalı deney (§12), masaüstünde yerel modda | §14 ölçütleri raporlandı |
+| Tez | Sürekli; son hal 29 Ara – Ocak başı | Her fazın sonunda ilgili bölüm yazılır | Teslim |
+
+LLM LoRA ince ayarı (§10.6) bu takvime sığmaz; tezde gelecek çalışma olarak yer alır.
 
 Bahar dönemindeki zorunlu staj nedeniyle geliştirme Ocak ortasında kapanır. Deney kendi kendine çalışacak şekilde tasarlandığı için stajla çakışan kısmı panodan uzaktan izlenir; yalnızca depo doldurma için fiziksel müdahale gerekir.
 
@@ -411,6 +418,9 @@ Bahar dönemindeki zorunlu staj nedeniyle geliştirme Ocak ortasında kapanır. 
 | LLM gerekçede sayı uydurur | Gerekçedeki sayılar araç çıktısıyla otomatik karşılaştırılır; eşleşmeyen gerekçe işaretlenir |
 | Öneri notları gereksiz veya tekrarlı olur | Konu başına tek açık not, günlük üst sınır, kullanıcı geri bildirimi (kabul/ret) |
 | Kendi verimiz model eğitmeye yetmez | Veri toplamanın Faz 1'de başlaması; açık veriyle ön eğitim; taban modelle dürüst karşılaştırma |
+| Parçalar İzmir'e gidişten önce gelmez | Sipariş Faz 0'ın ilk haftasında; gecikirse parçalar doğrudan İzmir adresine sipariş edilir, tezgah testi orada yapılır |
+| Azure ücretsiz katmanı gerçek kartın sürekli gönderimine yetmez (CPU kotası, uyku) | Gerçek kart bağlanınca kota izlenir; gerekirse ölçüm aralığı büyütülür veya İzmir döneminde Mac'te yerel mod kullanılır |
+| Düzenek İzmir'den eve taşınırken bitkiler etkilenir | Deney eve dönüşten sonra yeni bir uyum süresiyle başlar; İzmir verisi yalnızca model eğitiminde kullanılır |
 | Açık verinin koşulları saksıdan farklı | Aktarım performansı ayrıca raporlanır; ana test her zaman kendi verimizde |
 | Hatalı veya tutarsız nem sensörü | Yedek sensör; kanal bazında kalibrasyon; sabit değer ve ani sıçrama için sensör notu |
 | Su elektronikle temas eder | Elektronik buatta ve saksı seviyesinin üstünde; hortum bağlantıları kelepçeli; ilk testler boş saksıda |
