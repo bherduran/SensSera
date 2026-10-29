@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using SensSera.Application;
 using SensSera.Application.DTOs;
 using SensSera.Application.Exceptions;
 using SensSera.Application.Interfaces;
@@ -17,7 +18,7 @@ public sealed class NodeService(AppDbContext db, ITenantContext tenant, TimeProv
             .AsNoTracking()
             .Where(n => n.GreenhouseId == greenhouseId && n.OrganizationId == orgId)
             .OrderBy(n => n.Name)
-            .Select(ToResponse)
+            .Select(ToResponse(OnlineCutoff()))
             .ToListAsync(cancellationToken);
     }
 
@@ -27,7 +28,7 @@ public sealed class NodeService(AppDbContext db, ITenantContext tenant, TimeProv
         return await db.Nodes
             .AsNoTracking()
             .Where(n => n.Id == id && n.OrganizationId == orgId)
-            .Select(ToResponse)
+            .Select(ToResponse(OnlineCutoff()))
             .FirstOrDefaultAsync(cancellationToken)
             ?? throw new KeyNotFoundException($"Node {id} not found");
     }
@@ -127,13 +128,18 @@ public sealed class NodeService(AppDbContext db, ITenantContext tenant, TimeProv
             ?? throw new KeyNotFoundException($"Node {id} not found");
     }
 
-    private static readonly System.Linq.Expressions.Expression<Func<Node, NodeResponse>> ToResponse = n =>
+    private DateTime OnlineCutoff() => timeProvider.GetUtcNow().UtcDateTime - Heartbeat.OfflineAfter;
+
+    private static System.Linq.Expressions.Expression<Func<Node, NodeResponse>> ToResponse(DateTime onlineCutoff) => n =>
         new NodeResponse(
             n.Id,
             n.Name,
             n.GreenhouseId,
             n.FirmwareVersion,
             n.LastSeenAt,
+            n.LastSeenAt == null ? NodeStatus.NeverSeen
+                : n.LastSeenAt >= onlineCutoff ? NodeStatus.Online
+                : NodeStatus.Offline,
             n.CreatedAt,
             n.Devices
                 .OrderBy(d => d.Channel)

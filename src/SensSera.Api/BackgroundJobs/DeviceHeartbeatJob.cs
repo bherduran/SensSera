@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using SensSera.Application;
 using SensSera.Domain.Enums;
 using SensSera.Infrastructure.Persistence;
 
@@ -10,7 +11,6 @@ public sealed class DeviceHeartbeatJob(
     ILogger<DeviceHeartbeatJob> logger) : BackgroundService
 {
     private static readonly TimeSpan Interval = TimeSpan.FromMinutes(1);
-    private static readonly TimeSpan OfflineThreshold = TimeSpan.FromMinutes(5);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -31,7 +31,7 @@ public sealed class DeviceHeartbeatJob(
         using var scope = scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var now = timeProvider.GetUtcNow().UtcDateTime;
-        var cutoff = now - OfflineThreshold;
+        var cutoff = now - Heartbeat.OfflineAfter;
 
         await db.Devices
             .IgnoreQueryFilters()

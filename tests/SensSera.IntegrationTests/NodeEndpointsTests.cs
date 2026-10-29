@@ -48,6 +48,24 @@ public sealed class NodeEndpointsTests(SensSeraApiFactory factory)
     }
 
     [Fact]
+    public async Task NodeStatus_FollowsLastSeen()
+    {
+        var client = await RegisterAsync();
+        var (nodeId, nodeToken) = await CreateNodeWithChannelAsync(client, await CreateGreenhouseAsync(client));
+        (await StatusAsync(client, nodeId)).Should().Be("neverSeen");
+
+        (await IngestAsync(nodeToken, "soil1")).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await StatusAsync(client, nodeId)).Should().Be("online");
+
+        await using (var db = CreateDb())
+        {
+            await db.Nodes.IgnoreQueryFilters().Where(n => n.Id == nodeId)
+                .ExecuteUpdateAsync(s => s.SetProperty(n => n.LastSeenAt, DateTime.UtcNow.AddMinutes(-6)));
+        }
+        (await StatusAsync(client, nodeId)).Should().Be("offline");
+    }
+
+    [Fact]
     public async Task RotateToken_OldTokenStopsWorking_NewTokenWorks()
     {
         var client = await RegisterAsync();
@@ -178,6 +196,9 @@ public sealed class NodeEndpointsTests(SensSeraApiFactory factory)
             new { channel = "soil1", name = "Soil 1", metric = "SoilMoisture" })).EnsureSuccessStatusCode();
         return (nodeId, node.GetProperty("token").GetString()!);
     }
+
+    private static async Task<string> StatusAsync(HttpClient client, Guid nodeId) =>
+        (await client.GetFromJsonAsync<JsonElement>($"/api/nodes/{nodeId}")).GetProperty("status").GetString()!;
 
     private static async Task<Guid> ChannelDeviceIdAsync(HttpClient client, Guid nodeId)
     {
