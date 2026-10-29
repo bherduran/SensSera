@@ -12,16 +12,28 @@ public sealed class LlmOptions
 {
     public const string SectionName = "Llm";
 
-    /// <summary>Which <c>ILlmClient</c> backs the insight layer: "Anthropic" (default) or "Groq"
-    /// (free, OpenAI-compatible — used for local/dev testing without an Anthropic key). Set the
-    /// matching <see cref="Model"/> for the chosen provider.</summary>
+    /// <summary>Which <c>ILlmClient</c> backs the LLM layer: "Anthropic" (default), "Groq" (free cloud)
+    /// or "Ollama" (local, no API key). Groq and Ollama share one OpenAI-compatible adapter; only
+    /// <see cref="BaseUrl"/> differs. Set the matching <see cref="Model"/> for the chosen provider.</summary>
     [Required]
+    [AllowedValues("Anthropic", "Groq", "Ollama")]
     public string Provider { get; set; } = "Anthropic";
 
     /// <summary>Model id for the active <see cref="Provider"/>. Authoritative ids come from config,
-    /// never hardcoded (Anthropic e.g. "claude-opus-5"; Groq e.g. "openai/gpt-oss-120b").</summary>
+    /// never hardcoded (Anthropic e.g. "claude-opus-5"; Groq e.g. "openai/gpt-oss-120b";
+    /// Ollama e.g. "qwen3:8b").</summary>
     [Required]
     public string Model { get; set; } = "claude-opus-5";
+
+    /// <summary>Base address of an OpenAI-compatible endpoint. Empty = the provider default (Groq cloud,
+    /// or Ollama on localhost). Inside Docker Compose use "http://host.docker.internal:11434/v1/".
+    /// Ignored for Anthropic.</summary>
+    public string? BaseUrl { get; set; }
+
+    /// <summary>Per-request timeout for the OpenAI-compatible adapter. A local 8B model can take tens
+    /// of seconds per tool round, so this is well above a cloud API's typical latency.</summary>
+    [Range(5, 600)]
+    public int TimeoutSeconds { get; set; } = 120;
 
     /// <summary>Hours of recent readings to ground an alert explanation on.</summary>
     [Range(1, 168)]

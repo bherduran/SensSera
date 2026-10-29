@@ -20,6 +20,7 @@ using SensSera.Api.BackgroundJobs;
 using SensSera.Api.Hubs;
 using SensSera.Api.Realtime;
 using Anthropic;
+using Microsoft.Extensions.Options;
 using System.Threading.RateLimiting;
 
 
@@ -160,17 +161,20 @@ builder.Services.AddOptions<LlmOptions>()
     .ValidateOnStart();
 
 // The API key is read once here at the composition root and never bound into a logged options
-// object. Provider is a config switch: "Groq" (free, OpenAI-compatible — dev/testing) or the
-// default Anthropic path.
+// object. Provider is a config switch: "Groq"/"Ollama" (OpenAI-compatible) or the default
+// Anthropic path.
 var llmProvider = builder.Configuration["Llm:Provider"];
 var llmApiKey = builder.Configuration["Llm:ApiKey"];
 
-if (string.Equals(llmProvider, "Groq", StringComparison.OrdinalIgnoreCase))
+if (llmProvider is "Groq" or "Ollama")
 {
-    // Typed HttpClient carries Groq's OpenAI-compatible base address + bearer key.
-    builder.Services.AddHttpClient<ILlmClient, GroqLlmClient>(client =>
+    // Groq (cloud) and Ollama (local) both speak OpenAI /chat/completions: one adapter, base address
+    // from config. Ollama needs no key, so the bearer header is only set when one is configured.
+    builder.Services.AddHttpClient<ILlmClient, OpenAiCompatibleLlmClient>((sp, client) =>
     {
-        client.BaseAddress = new Uri("https://api.groq.com/openai/v1/");
+        var llm = sp.GetRequiredService<IOptions<LlmOptions>>().Value;
+        client.BaseAddress = OpenAiCompatibleLlmClient.ResolveBaseAddress(llm);
+        client.Timeout = TimeSpan.FromSeconds(llm.TimeoutSeconds);
         if (!string.IsNullOrWhiteSpace(llmApiKey))
             client.DefaultRequestHeaders.Authorization =
                 new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", llmApiKey);
