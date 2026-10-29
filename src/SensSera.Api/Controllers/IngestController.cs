@@ -18,20 +18,23 @@ public sealed class IngestController(IIngestionService service) : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Ingest([FromBody] IngestRequest request, CancellationToken cancellationToken)
     {
-        var deviceId = Guid.Parse(User.FindFirstValue("device_id")!);
-        var orgId = Guid.Parse(User.FindFirstValue("org_id")!);
-
-        await service.IngestAsync(deviceId, orgId, request, cancellationToken);
+        await service.IngestAsync(Source(), request, cancellationToken);
         return NoContent();
     }
 
     [HttpPost("batch")]
     public async Task<IActionResult> IngestBatch([FromBody] IngestBatchRequest request, CancellationToken cancellationToken)
     {
-        var deviceId = Guid.Parse(User.FindFirstValue("device_id")!);
-        var orgId = Guid.Parse(User.FindFirstValue("org_id")!);
-
-        await service.IngestBatchAsync(deviceId, orgId, request, cancellationToken);
+        await service.IngestBatchAsync(Source(), request, cancellationToken);
         return NoContent();
     }
+
+    // Claims come from DeviceTokenAuthenticationHandler: org_id always, plus device_id or node_id.
+    private IngestSource Source() => new(
+        Guid.Parse(User.FindFirstValue("org_id")!),
+        ClaimGuid("device_id"),
+        ClaimGuid("node_id"));
+
+    private Guid? ClaimGuid(string type) =>
+        Guid.TryParse(User.FindFirstValue(type), out var id) ? id : null;
 }

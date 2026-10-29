@@ -9,6 +9,11 @@ using SensSera.Infrastructure.Persistence;
 
 namespace SensSera.Api.Auth;
 
+/// <summary>
+/// Authenticates <c>X-Device-Token: {id}.{secret}</c>. The id is looked up as a standalone device
+/// first, then as a node (a board with several channels); only the SHA-256 of the secret is stored.
+/// A device emits a <c>device_id</c> claim, a node a <c>node_id</c> claim.
+/// </summary>
 public sealed class DeviceTokenAuthenticationHandler(
     IOptionsMonitor<AuthenticationSchemeOptions> options,
     ILoggerFactory logger,
@@ -25,29 +30,47 @@ public sealed class DeviceTokenAuthenticationHandler(
 
         var raw = tokenValue.ToString();
         var parts = raw.Split('.', 2);
-        if (parts.Length != 2 || !Guid.TryParse(parts[0], out var deviceId))
+        if (parts.Length != 2 || !Guid.TryParse(parts[0], out var id))
             return AuthenticateResult.Fail("Invalid token format");
 
         var secretHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(parts[1])));
+        var ct = Context.RequestAborted;
 
+        // Channel devices (NodeId set) have no usable token of their own; they report through their node.
         var device = await db.Devices
             .IgnoreQueryFilters()
-            .FirstOrDefaultAsync(d => d.Id == deviceId && d.DeviceTokenHash == secretHash);
+            .Where(d => d.Id == id && d.NodeId == null)
+            .Select(d => new { d.DeviceTokenHash, d.OrganizationId, d.GreenhouseId })
+            .FirstOrDefaultAsync(ct);
+        if (device is not null)
+            return HashMatches(device.DeviceTokenHash, secretHash)
+                ? Success("device_id", id, device.OrganizationId, device.GreenhouseId)
+                : AuthenticateResult.Fail("Invalid device token");
 
-        if (device is null)
-            return AuthenticateResult.Fail("Invalid device token");
+        var node = await db.Nodes
+            .IgnoreQueryFilters()
+            .Where(n => n.Id == id)
+            .Select(n => new { n.TokenHash, n.OrganizationId, n.GreenhouseId })
+            .FirstOrDefaultAsync(ct);
+        if (node is not null && HashMatches(node.TokenHash, secretHash))
+            return Success("node_id", id, node.OrganizationId, node.GreenhouseId);
 
-        var claims = new []
-        {
-            new Claim("device_id", device.Id.ToString()),
-            new Claim("org_id", device.OrganizationId.ToString()),
-            new Claim("greenhouse_id", device.GreenhouseId.ToString()),
-        };
-
-        var identity = new ClaimsIdentity(claims, SchemeName);
-        var principal = new ClaimsPrincipal(identity);
-        var ticket = new AuthenticationTicket(principal, SchemeName);
-
-        return AuthenticateResult.Success(ticket);                
+        return AuthenticateResult.Fail("Invalid device token");
     }
-}    
+
+    // Constant-time, so response timing does not reveal how much of the hash matched.
+    private static bool HashMatches(string stored, string computed) =>
+        CryptographicOperations.FixedTimeEquals(Encoding.ASCII.GetBytes(stored), Encoding.ASCII.GetBytes(computed));
+
+    private static AuthenticateResult Success(string idClaim, Guid id, Guid organizationId, Guid greenhouseId)
+    {
+        var claims = new[]
+        {
+            new Claim(idClaim, id.ToString()),
+            new Claim("org_id", organizationId.ToString()),
+            new Claim("greenhouse_id", greenhouseId.ToString()),
+        };
+        var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, SchemeName));
+        return AuthenticateResult.Success(new AuthenticationTicket(principal, SchemeName));
+    }
+}
