@@ -10,7 +10,9 @@ public record DeviceResponse(
     Guid GreenhouseId,
     MetricType Metric,
     DeviceStatus Status,
-    DateTime CreatedAt);
+    DateTime CreatedAt,
+    Guid? NodeId,
+    string? Channel);
 
 public record DeviceWithTokenResponse(
     Guid Id,
