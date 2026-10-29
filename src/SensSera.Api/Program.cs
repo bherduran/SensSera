@@ -103,12 +103,13 @@ builder.Services.AddRateLimiter(options =>
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
     // Per device token, not one global bucket: the simulator's six devices alone send ~72 req/min,
-    // so a shared 100/min left no room for a real board. The device_id claim comes from the
-    // verified token; the IP fallback only covers requests that reach here unauthenticated.
+    // so a shared 100/min left no room for a real board. The device_id / node_id claim comes from
+    // the verified token; the IP fallback only covers requests that reach here unauthenticated.
     options.AddPolicy("ingest", httpContext =>
     {
-        var key = httpContext.User.FindFirst("device_id")?.Value is { } deviceId
-            ? $"device:{deviceId}"
+        var user = httpContext.User;
+        var key = user.FindFirst("device_id")?.Value is { } deviceId ? $"device:{deviceId}"
+            : user.FindFirst("node_id")?.Value is { } nodeId ? $"node:{nodeId}"
             : $"ip:{httpContext.Connection.RemoteIpAddress}";
         return RateLimitPartition.GetFixedWindowLimiter(key, _ =>
             new FixedWindowRateLimiterOptions { PermitLimit = ingestPermitLimit, Window = TimeSpan.FromMinutes(1) });

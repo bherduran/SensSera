@@ -14,22 +14,25 @@ public sealed class IngestionService(
     TimeProvider timeProvider,
     ILogger<IngestionService> logger) : IIngestionService
 {
-    public Task IngestAsync(Guid deviceId, Guid organizationId, IngestRequest request, CancellationToken cancellationToken = default) =>
-        IngestManyAsync(deviceId, organizationId, [request], cancellationToken);
+    public Task IngestAsync(IngestSource source, IngestRequest request, CancellationToken cancellationToken = default) =>
+        IngestManyAsync(source, [request], cancellationToken);
 
-    public Task IngestBatchAsync(Guid deviceId, Guid organizationId, IngestBatchRequest request, CancellationToken cancellationToken = default) =>
-        IngestManyAsync(deviceId, organizationId, request.Readings, cancellationToken);
+    public Task IngestBatchAsync(IngestSource source, IngestBatchRequest request, CancellationToken cancellationToken = default) =>
+        IngestManyAsync(source, request.Readings, cancellationToken);
 
     // One INSERT batch + one LastSeenAt update per request, however many readings it carries.
     private async Task IngestManyAsync(
-        Guid deviceId, Guid organizationId, IReadOnlyList<IngestRequest> requests, CancellationToken cancellationToken)
+        IngestSource source, IReadOnlyList<IngestRequest> requests, CancellationToken cancellationToken)
     {
+        // Resolve and check every reading before writing anything: a batch is all-or-nothing.
+        var targets = await ResolveTargetsAsync(source, requests, cancellationToken);
+
         var now = timeProvider.GetUtcNow().UtcDateTime;
-        var readings = requests.Select(r => new SensorReading
+        var readings = requests.Select((r, i) => new SensorReading
         {
-            DeviceId = deviceId,
-            OrganizationId = organizationId,
-            Metric = ParseMetric(r.Metric),
+            DeviceId = targets[i].Id,
+            OrganizationId = source.OrganizationId,
+            Metric = targets[i].Metric,
             Value = r.Value,
             RecordedAt = ToUtc(r.RecordedAt),
             IngestedAt = now,
@@ -39,22 +42,69 @@ public sealed class IngestionService(
 
         db.SensorReadings.AddRange(readings);
 
+        var deviceIds = targets.Select(t => t.Id).Distinct().ToList();
         await db.Devices
-            .Where(d => d.Id == deviceId)
+            .Where(d => deviceIds.Contains(d.Id))
             .ExecuteUpdateAsync(s => s
                 .SetProperty(d => d.LastSeenAt, now)
                 .SetProperty(d => d.Status, DeviceStatus.Active), cancellationToken);
 
+        if (source.NodeId is { } nodeId)
+            await db.Nodes
+                .Where(n => n.Id == nodeId)
+                .ExecuteUpdateAsync(s => s.SetProperty(n => n.LastSeenAt, now), cancellationToken);
+
         await db.SaveChangesAsync(cancellationToken);
 
-        var greenhouseId = await db.Devices
-            .AsNoTracking()
-            .Where(d => d.Id == deviceId)
-            .Select(d => d.GreenhouseId)
-            .FirstOrDefaultAsync(cancellationToken);
+        for (var i = 0; i < readings.Count; i++)
+            await PushReadingAsync(source.OrganizationId, targets[i].GreenhouseId, readings[i], cancellationToken);
+    }
 
-        foreach (var reading in readings)
-            await PushReadingAsync(organizationId, greenhouseId, reading, cancellationToken);
+    private sealed record Target(Guid Id, MetricType Metric, string? Channel, Guid GreenhouseId);
+
+    // Maps each reading to the device it belongs to: the token's own device, or for a node the
+    // device registered on the reading's channel. The reading's metric must match that device's
+    // metric, so a miswired channel is rejected instead of silently stored under the wrong sensor.
+    private async Task<IReadOnlyList<Target>> ResolveTargetsAsync(
+        IngestSource source, IReadOnlyList<IngestRequest> requests, CancellationToken cancellationToken)
+    {
+        var query = db.Devices.AsNoTracking();
+        query = source.NodeId is { } nodeId
+            ? query.Where(d => d.NodeId == nodeId)
+            : query.Where(d => d.Id == source.DeviceId);
+        var devices = await query
+            .Select(d => new Target(d.Id, d.Metric, d.Channel, d.GreenhouseId))
+            .ToListAsync(cancellationToken);
+
+        var byChannel = devices.Where(d => d.Channel is not null).ToDictionary(d => d.Channel!, StringComparer.Ordinal);
+
+        return requests.Select((r, i) =>
+        {
+            var prefix = requests.Count > 1 ? $"Reading {i}: " : "";
+            Target target;
+            if (source.NodeId is null)
+            {
+                if (r.Channel is not null)
+                    throw new ArgumentException($"{prefix}channel is only valid with a node token.");
+                // Deleted between authentication and here: treat like a revoked token.
+                target = devices.SingleOrDefault()
+                    ?? throw new UnauthorizedAccessException("Device no longer exists.");
+            }
+            else
+            {
+                if (r.Channel is null)
+                    throw new ArgumentException($"{prefix}channel is required with a node token.");
+                if (!byChannel.TryGetValue(r.Channel, out target!))
+                    throw new ArgumentException($"{prefix}unknown channel '{r.Channel}'.");
+            }
+
+            var metric = ParseMetric(r.Metric);
+            if (metric != target.Metric)
+                throw new ArgumentException(target.Channel is null
+                    ? $"{prefix}this device measures {target.Metric}, not {metric}."
+                    : $"{prefix}channel '{target.Channel}' measures {target.Metric}, not {metric}.");
+            return target;
+        }).ToList();
     }
 
     private static MetricType ParseMetric(string metric) =>

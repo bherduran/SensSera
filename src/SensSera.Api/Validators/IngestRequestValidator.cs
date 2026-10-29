@@ -31,6 +31,12 @@ public sealed class IngestRequestValidator : AbstractValidator<IngestRequest>
             .WithMessage("Value is out of valid range for the given metric");
 
         RuleFor(x => x.RecordedAt)
-            .NotEmpty();               
+            .NotEmpty();
+
+        // Whether a channel is required or allowed depends on the token, checked in IngestionService.
+        RuleFor(x => x.Channel)
+            .NotEmpty()
+            .MaximumLength(32)
+            .When(x => x.Channel is not null);
     }
 }
