@@ -49,29 +49,25 @@ bool formatIso8601Utc(uint32_t epoch, char* buf, size_t len) {
 size_t buildBatchJson(const RingBuffer<Reading>& buffer, size_t count, char* buf, size_t len) {
   if (count > buffer.size()) count = buffer.size();
   size_t pos = 0;
-  auto append = [&](const char* fmt, auto... args) {
-    if (pos >= len) return false;
-    int n = snprintf(buf + pos, len - pos, fmt, args...);
-    if (n < 0 || static_cast<size_t>(n) >= len - pos) {
-      pos = len;  // mark overflow
-      return false;
-    }
+  // snprintf returns the length it wanted; anything >= the space left means truncation.
+  auto advance = [&](int n) {
+    if (n < 0 || static_cast<size_t>(n) >= len - pos) return false;
     pos += static_cast<size_t>(n);
     return true;
   };
 
-  if (!append("{\"readings\":[")) return 0;
+  if (len == 0 || !advance(snprintf(buf, len, "{\"readings\":["))) return 0;
   for (size_t i = 0; i < count; i++) {
     const Reading& r = buffer.at(i);
     const ChannelDef& ch = kChannels[r.channel];
     char when[24];
     if (!formatIso8601Utc(r.epoch, when, sizeof when)) return 0;
-    if (!append("%s{\"metric\":\"%s\",\"value\":%.2f,\"recordedAt\":\"%s\",\"channel\":\"%s\"}",
-                i == 0 ? "" : ",", ch.metric, static_cast<double>(r.value), when, ch.code)) {
-      return 0;
-    }
+    int n = snprintf(buf + pos, len - pos,
+                     "%s{\"metric\":\"%s\",\"value\":%.2f,\"recordedAt\":\"%s\",\"channel\":\"%s\"}",
+                     i == 0 ? "" : ",", ch.metric, static_cast<double>(r.value), when, ch.code);
+    if (!advance(n)) return 0;
   }
-  if (!append("]}")) return 0;
+  if (!advance(snprintf(buf + pos, len - pos, "]}"))) return 0;
   return pos;
 }
 
