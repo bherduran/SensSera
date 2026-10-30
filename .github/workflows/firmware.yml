@@ -1,0 +1,62 @@
+name: Firmware
+
+on:
+  push:
+    branches: ["**"]
+    paths: ["firmware/**", ".github/workflows/firmware.yml"]
+  pull_request:
+    branches: [main]
+    paths: ["firmware/**", ".github/workflows/firmware.yml"]
+
+jobs:
+  firmware:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: firmware
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      # Toolchains and libraries are ~1 GB; key on the pinned versions in platformio.ini.
+      - uses: actions/cache@v6
+        with:
+          path: ~/.platformio
+          key: pio-${{ hashFiles('firmware/platformio.ini') }}
+
+      - run: pip install platformio==6.2.0
+
+      - name: Unit tests (host)
+        run: pio test -e native
+
+      - name: Build ESP32-S3 image
+        env:
+          FIRMWARE_VERSION: 0.1.0+${{ github.sha }}
+        run: |
+          export FIRMWARE_VERSION="${FIRMWARE_VERSION:0:14}"
+          pio run -e esp32s3
+
+      # Separate images with their offsets, not one merged file: a merged image fills the
+      # gap at 0x9000 and would wipe NVS (Wi-Fi + token) when flashed from the browser.
+      - name: Collect images
+        run: |
+          out=../fw-out && mkdir -p $out
+          b=.pio/build/esp32s3
+          cp $b/bootloader.bin $b/partitions.bin $b/firmware.bin $out/
+          cp ~/.platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin $out/
+          cat > $out/offsets.txt <<'EOF'
+          0x0000  bootloader.bin
+          0x8000  partitions.bin
+          0xe000  boot_app0.bin
+          0x10000 firmware.bin
+          EOF
+          ls -l $out
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: firmware-esp32s3-${{ github.sha }}
+          path: fw-out/
+          retention-days: 30
