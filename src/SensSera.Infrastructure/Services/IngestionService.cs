@@ -49,10 +49,13 @@ public sealed class IngestionService(
                 .SetProperty(d => d.LastSeenAt, now)
                 .SetProperty(d => d.Status, DeviceStatus.Active), cancellationToken);
 
+        // COALESCE keeps the stored version when a request doesn't report one (older firmware).
         if (source.NodeId is { } nodeId)
             await db.Nodes
                 .Where(n => n.Id == nodeId)
-                .ExecuteUpdateAsync(s => s.SetProperty(n => n.LastSeenAt, now), cancellationToken);
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(n => n.LastSeenAt, now)
+                    .SetProperty(n => n.FirmwareVersion, n => source.FirmwareVersion ?? n.FirmwareVersion), cancellationToken);
 
         await db.SaveChangesAsync(cancellationToken);
 
