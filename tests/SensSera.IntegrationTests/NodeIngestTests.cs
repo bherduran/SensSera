@@ -112,6 +112,54 @@ public sealed class NodeIngestTests(SensSeraApiFactory factory)
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
+    [Fact]
+    public async Task NodeToken_WithFirmwareHeader_StoresVersionOnNode()
+    {
+        var seed = await SeedAsync();
+
+        var response = await PostBatchAsync(seed.NodeToken, "0.1.0+b8bd68c8", SoilReading());
+
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await NodeFirmwareAsync(seed.NodeId)).Should().Be("0.1.0+b8bd68c8");
+    }
+
+    [Fact]
+    public async Task NodeToken_WithoutFirmwareHeader_KeepsStoredVersion()
+    {
+        var seed = await SeedAsync();
+        await PostBatchAsync(seed.NodeToken, "0.1.0+b8bd68c8", SoilReading());
+
+        var response = await PostBatchAsync(seed.NodeToken, SoilReading());
+
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await NodeFirmwareAsync(seed.NodeId)).Should().Be("0.1.0+b8bd68c8");
+    }
+
+    // A bad label must not cost the readings: the request succeeds and the version is ignored.
+    [Theory]
+    [InlineData("0.1.0 <script>")]
+    [InlineData("123456789012345678901234567890123456789012345678901")]
+    public async Task NodeToken_MalformedFirmwareHeader_StoresReadingsButNotVersion(string version)
+    {
+        var seed = await SeedAsync();
+
+        var response = await PostBatchAsync(seed.NodeToken, version, SoilReading());
+
+        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await NodeFirmwareAsync(seed.NodeId)).Should().BeNull();
+        await using var db = CreateDb();
+        (await db.SensorReadings.IgnoreQueryFilters().CountAsync(r => r.OrganizationId == seed.OrgId)).Should().Be(1);
+    }
+
+    private static object SoilReading() =>
+        new { metric = "SoilMoisture", value = 40.0, recordedAt = DateTime.UtcNow, channel = "soil1" };
+
+    private async Task<string?> NodeFirmwareAsync(Guid nodeId)
+    {
+        await using var db = CreateDb();
+        return (await db.Nodes.IgnoreQueryFilters().AsNoTracking().SingleAsync(n => n.Id == nodeId)).FirmwareVersion;
+    }
+
     private sealed record Seed(Guid OrgId, Guid NodeId, Guid SoilDeviceId, Guid AirDeviceId, string NodeToken, string StandaloneToken);
 
     private async Task<Seed> SeedAsync()
@@ -138,13 +186,18 @@ public sealed class NodeIngestTests(SensSeraApiFactory factory)
         return new Seed(org.Id, node.Id, soil.Id, air.Id, $"{node.Id}.{Secret}", $"{standalone.Id}.{Secret}");
     }
 
-    private Task<HttpResponseMessage> PostBatchAsync(string token, params object[] readings)
+    private Task<HttpResponseMessage> PostBatchAsync(string token, params object[] readings) =>
+        PostBatchAsync(token, firmwareVersion: null, readings);
+
+    private Task<HttpResponseMessage> PostBatchAsync(string token, string? firmwareVersion, params object[] readings)
     {
         var request = new HttpRequestMessage(HttpMethod.Post, "/api/ingest/batch")
         {
             Content = JsonContent.Create(new { readings }),
         };
         request.Headers.Add("X-Device-Token", token);
+        if (firmwareVersion is not null)
+            request.Headers.TryAddWithoutValidation("X-Firmware-Version", firmwareVersion);
         return factory.CreateClient().SendAsync(request);
     }
 
