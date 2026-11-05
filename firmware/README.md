@@ -45,7 +45,7 @@ Plug in the board's **USB** port (not "COM") and open a serial terminal at 11520
    `last HTTP 204`.
 
 Default channels: `soil1` `soil2` `soil3` (GPIO4/5/6), `air_temp` `air_humidity`
-(DHT22, GPIO16), `light` (BH1750, GPIO8/9). The spare probe is `soil4` (GPIO7), off by
+(AHT25), `light` (BH1750). Both sit on the I²C bus at GPIO8/9. The spare probe is `soil4` (GPIO7), off by
 default: `channel soil4 on`.
 
 ## Calibrating a soil probe

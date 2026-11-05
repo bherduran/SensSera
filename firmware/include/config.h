@@ -8,9 +8,8 @@
 #endif
 
 // PRD §5.3 pin plan (ESP32-S3 DevKitC N16R8). Soil ADC pins live in core::kChannels.
-constexpr uint8_t kPinDht = 16;
 constexpr uint8_t kPinI2cSda = 8;
-constexpr uint8_t kPinI2cScl = 9;
+constexpr uint8_t kPinI2cScl = 9;  // shared by the AHT25 (0x38) and BH1750 (0x23)
 
 constexpr const char* kDefaultApiUrl = "https://senssera-api-wcav7.azurewebsites.net";
 

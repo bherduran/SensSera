@@ -66,7 +66,7 @@ SensSera bugün simülatörden gelen veriyle çalışıyor ve LLM yalnızca alar
 | --- | --- | --- |
 | ESP32-S3 DevKitC N16R8 (pin başlıkları lehimli) | 1 | Wi-Fi dahili, Arduino çatısıyla programlanır |
 | Kapasitif toprak nem sensörü v1.2 | 3 (+1 yedek) | Rezistif (FC-28 gibi) değil: rezistif problar toprakta korozyona uğrar. Ucuz v1.2 kartların bir kısmı hatalı çıkabiliyor, yedek alıp kalibrasyonda test et |
-| DHT22 (AM2302) sıcaklık/nem | 1 | Hava sıcaklığı ve nemi. Daha hassası istenirse SHT31 (I²C) |
+| AHT25 sıcaklık/nem (I²C) | 1 | Hava sıcaklığı ve nemi (±0,3 °C, ±2 %RH). DHT22 ve SHT31 stokta olmadığı için seçildi; BH1750 ile aynı I²C hattını paylaşır |
 | BH1750 ışık sensörü | 1 | I²C, lux cinsinden; mevcut `Light` metriğinin 0–100.000 aralığına uyar |
 | 3–6 V mini dalgıç pompa | 3 | Saksı başına bir pompa; aynı anda yalnızca biri çalışır |
 | Silikon hortum | 2–3 m | Pompanın çıkış çapına uygun |
@@ -87,8 +87,7 @@ Deney karşılaştırması (§12) için üç saksıda **aynı bitki türü, ayn�
 | Bağlantı | ESP32-S3 pini | Gerekçe |
 | --- | --- | --- |
 | Nem sensörü 1 / 2 / 3 (yedek: 4) | GPIO4 / GPIO5 / GPIO6 (GPIO7) | ADC1 pinleri (S3'te GPIO1–10); ADC2 Wi-Fi açıkken kullanılamaz |
-| DHT22 veri | GPIO16 | 10 kΩ pull-up (çoğu modülde hazır) |
-| BH1750 SDA / SCL | GPIO8 / GPIO9 | S3 DevKitC'nin Arduino'daki varsayılan I²C pinleri |
+| AHT25 + BH1750 SDA / SCL | GPIO8 / GPIO9 | S3 DevKitC'nin Arduino'daki varsayılan I²C pinleri; adresler farklı (0x38, 0x23). Kablo 50 cm'yi geçmemeli |
 | Şamandıra şalter | GPIO17 | `INPUT_PULLUP`; LOW = depo boş (kalibrasyonda doğrulanır) |
 | Röle 1 / 2 / 3 (pompalar) | GPIO11 / GPIO12 / GPIO13 | Strapping pinlerinden (GPIO0, 3, 45, 46) kaçınılır; açılışta pompa tetiklenmez |
 
@@ -102,7 +101,7 @@ Her nem sensörü için iki ham değer kaydedilir: havada (kuru) ve suda (ıslak
 
 ## 6. Firmware gereksinimleri
 
-- **Çatı:** PlatformIO + Arduino çatısı. Kütüphaneler: `WiFi`, `HTTPClient`, `ArduinoJson`, DHT, BH1750, `Preferences`.
+- **Çatı:** PlatformIO + Arduino çatısı. Kütüphaneler: `WiFi`, `HTTPClient`, `ArduinoJson`, AHTX0 (AHT25), BH1750, `Preferences`.
 - **Kimlik:** Kart tokenı ve Wi-Fi bilgileri NVS'te (`Preferences`) saklanır; repoya girmez. İlk kurulum seri port üzerinden basit bir komutla yapılır.
 - **Zaman:** Açılışta NTP ile saat alınır. `recordedAt` her zaman UTC gönderilir.
 - **Ölçüm:** Her kanal için 10 örneğin ortalaması alınır; varsayılan ölçüm aralığı 30 sn, sunucudan değiştirilebilir.
