@@ -101,7 +101,7 @@ Her nem sensörü için iki ham değer kaydedilir: havada (kuru) ve suda (ıslak
 
 ## 6. Firmware gereksinimleri
 
-- **Çatı:** PlatformIO + Arduino çatısı. Kütüphaneler: `WiFi`, `HTTPClient`, `ArduinoJson`, AHTX0 (AHT25), BH1750, `Preferences`.
+- **Çatı:** PlatformIO + Arduino çatısı. Kütüphaneler: `WiFi`, `HTTPClient`, `ArduinoJson`, BH1750, `Preferences`. AHT25 için kütüphane yerine küçük bir sürücü yazılır: Adafruit AHTX0 meşgul bitini süresiz bekliyor, takılan bir sensör kartı watchdog döngüsüne sokar.
 - **Kimlik:** Kart tokenı ve Wi-Fi bilgileri NVS'te (`Preferences`) saklanır; repoya girmez. İlk kurulum seri port üzerinden basit bir komutla yapılır.
 - **Zaman:** Açılışta NTP ile saat alınır. `recordedAt` her zaman UTC gönderilir.
 - **Ölçüm:** Her kanal için 10 örneğin ortalaması alınır; varsayılan ölçüm aralığı 30 sn, sunucudan değiştirilebilir.

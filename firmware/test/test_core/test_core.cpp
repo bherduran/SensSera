@@ -138,6 +138,40 @@ static void channelIndex_KnownAndUnknown() {
   TEST_ASSERT_EQUAL(-1, channelIndex("pump1"));
 }
 
+// 50 %RH (0x80000) and 25 °C (0x60000) packed the way the sensor sends them.
+static void makeAhtFrame(uint8_t* f) {
+  const uint8_t body[] = {0x18, 0x80, 0x00, 0x06, 0x00, 0x00};
+  memcpy(f, body, sizeof body);
+  f[6] = ahtCrc8(f, 6);
+}
+
+static void ahtCrc8_MatchesReferenceVector() {
+  const uint8_t data[] = {0xBE, 0xEF};  // CRC-8/NRSC-5 (poly 0x31, init 0xFF) reference
+  TEST_ASSERT_EQUAL_HEX8(0x92, ahtCrc8(data, 2));
+}
+
+static void decodeAht_ConvertsRawValues() {
+  uint8_t f[kAhtFrameLen];
+  makeAhtFrame(f);
+  float t, h;
+  TEST_ASSERT_TRUE(decodeAht(f, &t, &h));
+  TEST_ASSERT_FLOAT_WITHIN(0.001f, 25.0f, t);
+  TEST_ASSERT_FLOAT_WITHIN(0.001f, 50.0f, h);
+}
+
+static void decodeAht_RejectsBusyAndCorruptFrames() {
+  uint8_t f[kAhtFrameLen];
+  float t, h;
+  makeAhtFrame(f);
+  f[0] |= kAhtStatusBusy;
+  f[6] = ahtCrc8(f, 6);
+  TEST_ASSERT_FALSE(decodeAht(f, &t, &h));
+
+  makeAhtFrame(f);
+  f[2] ^= 0x01;  // one flipped bit on the wire
+  TEST_ASSERT_FALSE(decodeAht(f, &t, &h));
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(ringBuffer_WhenFull_DropsOldest);
@@ -153,5 +187,8 @@ int main() {
   RUN_TEST(nextBackoffMs_DoublesUpToCap);
   RUN_TEST(splitArgs_KeepsQuotedSpaces);
   RUN_TEST(channelIndex_KnownAndUnknown);
+  RUN_TEST(ahtCrc8_MatchesReferenceVector);
+  RUN_TEST(decodeAht_ConvertsRawValues);
+  RUN_TEST(decodeAht_RejectsBusyAndCorruptFrames);
   return UNITY_END();
 }

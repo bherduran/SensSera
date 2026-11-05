@@ -49,6 +49,18 @@ struct SoilCalibration {
 };
 bool soilPercent(float mv, SoilCalibration cal, float* out);
 
+// AHT20/AHT25 measurement frame: status, 20-bit humidity, 20-bit temperature, CRC-8.
+constexpr size_t kAhtFrameLen = 7;
+constexpr uint8_t kAhtStatusBusy = 0x80;
+constexpr uint8_t kAhtStatusCalibrated = 0x08;
+
+// CRC-8 used by the AHT20 family: polynomial 0x31, initial value 0xFF.
+uint8_t ahtCrc8(const uint8_t* data, size_t len);
+
+// Decodes a frame into °C and %RH. Returns false while the sensor is still busy or when
+// the CRC doesn't match (a glitch on a long I2C cable), so the caller can retry.
+bool decodeAht(const uint8_t* frame, float* tempC, float* humidityPct);
+
 // "2026-10-30T11:05:00Z" into buf (needs at least 21 bytes). Returns false if it doesn't fit.
 bool formatIso8601Utc(uint32_t epoch, char* buf, size_t len);
 
