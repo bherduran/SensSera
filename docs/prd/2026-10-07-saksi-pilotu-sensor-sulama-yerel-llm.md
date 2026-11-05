@@ -6,7 +6,7 @@ Tarih: 2026-10-07 · Sürüm: 2 · Durum: Taslak · Kapsam: yeni ESP32 firmware'
 
 SensSera bugün simülatörden gelen veriyle çalışıyor ve LLM yalnızca alarmları açıklayıp soruları cevaplıyor. Bu PRD sistemi gerçek saksılarda kendi kararını veren bir sisteme dönüştürür:
 
-1. **Gerçek sensörler:** 2–3 saksılık bir deney setinde ESP32 tabanlı bir kart; toprak nemi, hava sıcaklığı ve nemi, ışık ve su deposu seviyesini ölçer.
+1. **Gerçek sensörler:** Tek saksılık bir deney setinde ESP32 tabanlı bir kart; toprak nemi, hava sıcaklığı ve nemi, ışık ve su deposu seviyesini ölçer.
 2. **LLM kararlı sulama:** Yerel LLM, sensör verisine ve tahmin modeline bakarak hangi saksının ne zaman, kaç saniye sulanacağına karar verir ve kararı uygular. Kararlar kodla tanımlanmış bir güvenlik zarfının içinde kalır; LLM erişilemezse kural tabanlı kontrol devreye girer.
 3. **Öneri notları:** LLM sulama dışında da öneri üretir: eşik ayarı, saksı yerleşimi, sensör arızası, depo doldurma zamanı. Her not gerekçesi ve dayandığı veriyle kaydedilir; ayar değiştiren öneriler kullanıcı onayıyla uygulanır.
 4. **Eğitilmiş tahmin modeli:** Açık veri setleri ve kendi saksı verimizle eğitilen bir model, her saksının önümüzdeki saatlerdeki nemini ve eşiğe ne zaman düşeceğini tahmin eder. LLM bu tahmini bir araç olarak kullanır.
@@ -60,15 +60,15 @@ SensSera bugün simülatörden gelen veriyle çalışıyor ve LLM yalnızca alar
 
 "Arduino" olarak **ESP32-S3 DevKitC (N16R8: 16 MB flash, 8 MB PSRAM)** kullanılır. PlatformIO ile, Arduino çatısıyla programlanır. Klasik Arduino Uno'nun Wi-Fi'ı yok; ek modülle uğraşmak yerine Wi-Fi'ı dahili ESP32 seçilir. S3, ilk plandaki WROOM-32'ye göre daha fazla bellek ve yerel USB sunar; yerel USB, firmware'in tarayıcıdan sürücüsüz yüklenmesini sağlar (§6). Kart yalnızca 2,4 GHz Wi-Fi'a bağlanır.
 
-### 5.2 Malzeme listesi (3 saksı için)
+### 5.2 Malzeme listesi (1 saksı için)
 
 | Parça | Adet | Not |
 | --- | --- | --- |
 | ESP32-S3 DevKitC N16R8 (pin başlıkları lehimli) | 1 | Wi-Fi dahili, Arduino çatısıyla programlanır |
-| Kapasitif toprak nem sensörü v1.2 | 3 (+1 yedek) | Rezistif (FC-28 gibi) değil: rezistif problar toprakta korozyona uğrar. Ucuz v1.2 kartların bir kısmı hatalı çıkabiliyor, yedek alıp kalibrasyonda test et |
-| DHT22 (AM2302) sıcaklık/nem | 1 | Hava sıcaklığı ve nemi. Daha hassası istenirse SHT31 (I²C) |
+| Kapasitif toprak nem sensörü v1.2 | 1 (+2 yedek) | Rezistif (FC-28 gibi) değil: rezistif problar toprakta korozyona uğrar. Ucuz v1.2 kartların bir kısmı hatalı çıkabiliyor, yedek alıp kalibrasyonda test et |
+| AHT25 sıcaklık/nem (I²C) | 1 | Hava sıcaklığı ve nemi (±0,3 °C, ±2 %RH). DHT22 ve SHT31 stokta olmadığı için seçildi; BH1750 ile aynı I²C hattını paylaşır |
 | BH1750 ışık sensörü | 1 | I²C, lux cinsinden; mevcut `Light` metriğinin 0–100.000 aralığına uyar |
-| 3–6 V mini dalgıç pompa | 3 | Saksı başına bir pompa; aynı anda yalnızca biri çalışır |
+| 3–6 V mini dalgıç pompa | 1 | Saksı başına bir pompa; ikinci saksı eklenirse röle 2'ye bağlanır |
 | Silikon hortum | 2–3 m | Pompanın çıkış çapına uygun |
 | 4 kanallı 5 V röle modülü (optokuplörlü) | 1 | Alternatif: mantık seviyeli MOSFET (IRLZ44N) + 1N4007 diyot |
 | Şamandıra şalter (float switch) | 1 | Depo boşken pompayı kilitler |
@@ -80,15 +80,14 @@ SensSera bugün simülatörden gelen veriyle çalışıyor ve LLM yalnızca alar
 | Su geçirmez buat (IP65) | 1 | Elektronik saksıların yanında, su sıçramasına karşı |
 | Ölçü kabı | 1 | Pompa debisini ölçmek için |
 
-Deney karşılaştırması (§12) için üç saksıda **aynı bitki türü, aynı toprak ve aynı saksı boyutu** kullanılır. Fiyat sütunu bilinçli olarak boş bırakıldı; Robotistan veya Direnc.net gibi yerel tedarikçilerden güncel fiyatlarla doldurulmalı.
+Bütçe nedeniyle tek saksı kullanılır; karşılaştırma saksılar arasında değil, aynı saksıda dönemler arasında yapılır (§12). Firmware ve veri modeli birden fazla saksıyı destekler; kart 4 nem ve 4 röle kanalına kadar genişler. Fiyat sütunu bilinçli olarak boş bırakıldı; Robotistan veya Direnc.net gibi yerel tedarikçilerden güncel fiyatlarla doldurulmalı.
 
 ### 5.3 Pin planı
 
 | Bağlantı | ESP32-S3 pini | Gerekçe |
 | --- | --- | --- |
 | Nem sensörü 1 / 2 / 3 (yedek: 4) | GPIO4 / GPIO5 / GPIO6 (GPIO7) | ADC1 pinleri (S3'te GPIO1–10); ADC2 Wi-Fi açıkken kullanılamaz |
-| DHT22 veri | GPIO16 | 10 kΩ pull-up (çoğu modülde hazır) |
-| BH1750 SDA / SCL | GPIO8 / GPIO9 | S3 DevKitC'nin Arduino'daki varsayılan I²C pinleri |
+| AHT25 + BH1750 SDA / SCL | GPIO8 / GPIO9 | S3 DevKitC'nin Arduino'daki varsayılan I²C pinleri; adresler farklı (0x38, 0x23). Kablo 50 cm'yi geçmemeli |
 | Şamandıra şalter | GPIO17 | `INPUT_PULLUP`; LOW = depo boş (kalibrasyonda doğrulanır) |
 | Röle 1 / 2 / 3 (pompalar) | GPIO11 / GPIO12 / GPIO13 | Strapping pinlerinden (GPIO0, 3, 45, 46) kaçınılır; açılışta pompa tetiklenmez |
 
@@ -102,7 +101,7 @@ Her nem sensörü için iki ham değer kaydedilir: havada (kuru) ve suda (ıslak
 
 ## 6. Firmware gereksinimleri
 
-- **Çatı:** PlatformIO + Arduino çatısı. Kütüphaneler: `WiFi`, `HTTPClient`, `ArduinoJson`, DHT, BH1750, `Preferences`.
+- **Çatı:** PlatformIO + Arduino çatısı. Kütüphaneler: `WiFi`, `HTTPClient`, `ArduinoJson`, AHTX0 (AHT25), BH1750, `Preferences`.
 - **Kimlik:** Kart tokenı ve Wi-Fi bilgileri NVS'te (`Preferences`) saklanır; repoya girmez. İlk kurulum seri port üzerinden basit bir komutla yapılır.
 - **Zaman:** Açılışta NTP ile saat alınır. `recordedAt` her zaman UTC gönderilir.
 - **Ölçüm:** Her kanal için 10 örneğin ortalaması alınır; varsayılan ölçüm aralığı 30 sn, sunucudan değiştirilebilir.
@@ -347,15 +346,16 @@ Danışman "eğitim"le LLM'in kendisini kastediyorsa: deney boyunca biriken kara
 
 ## 12. Deney tasarımı
 
-Üç özdeş saksı (aynı bitki, toprak, saksı boyutu, yakın konum):
+Tek saksı, iki kontrol modu dönemler hâlinde sırayla çalıştırılır:
 
-| Saksı | Kontrol | Amaç |
+| Mod | Kontrol | Amaç |
 | --- | --- | --- |
 | A | Kural motoru | Karşılaştırma tabanı |
 | B | LLM + tahmin modeli | Önerilen sistem |
-| C | LLM, tahmin aracı kapalı | Tahmin modelinin katkısını ayırmak |
 
-İlk hafta sonunda modlar saksılar arasında döndürülür ve 1 hafta daha çalıştırılır (takvim tek döneme sığsın diye 2 + 2 haftadan kısaltıldı; süre kısalığı tezde sınırlılık olarak belirtilir); böylece saksının konumundan (ışık, sıcaklık) gelen fark sonuçlara karışmaz. Karşılaştırılanlar: bant içinde geçen süre, kullanılan toplam su, sulama sayısı, politika tarafından kırpılan/reddedilen karar sayısı ve öneri notlarının kabul oranı.
+Dönemler 2–3 günlük bloklar hâlinde A, B, A, B sırasıyla, toplam yaklaşık 2 hafta sürer (takvim tek döneme sığsın diye kısa tutuldu). Tek uzun A ve tek uzun B dönemi yerine bloklar kullanılır: hava sıcaklığı, ışık ve bitkinin büyümesi zamanla değişir; dönemler iç içe geçince bu değişim iki moda da benzer şekilde dağılır. Her blok başında soak süresi kadar geçiş bekleme yapılır ve bu süre ölçüme katılmaz. Tek saksı ve kısa süre tezde sınırlılık olarak belirtilir; hava sıcaklığı ve ışık her blok için raporlanır ki blokların koşulları karşılaştırılabilsin. Karşılaştırılanlar (gün başına normalize): bant içinde geçen süre, kullanılan toplam su, sulama sayısı, politika tarafından kırpılan/reddedilen karar sayısı ve öneri notlarının kabul oranı.
+
+Tahmin modelinin katkısı (eski C saksısı) sahada değil, karar setinde (§9.6) ölçülür: aynı 30 senaryo `get_moisture_forecast` aracı açık ve kapalı olarak çalıştırılır, doğru aksiyon oranları karşılaştırılır.
 
 ## 13. Dağıtım modları
 
@@ -372,8 +372,8 @@ Azure'daki API, PC'deki Ollama'ya erişemez; LLM kararlı sulama bu yüzden yere
 | Ölçüt | Hedef |
 | --- | --- |
 | Veri tamlığı (beklenen okumaların ulaşan oranı) | En az %95 |
-| Nem kontrolü (B saksısı) | Bekleme süreleri hariç, ölçümlerin en az %80'i bant içinde; A saksısından düşük değil |
-| Su kullanımı | B saksısı A'dan fazla su kullanmıyor (raporlanır) |
+| Nem kontrolü (B dönemleri) | Bekleme süreleri hariç, ölçümlerin en az %80'i bant içinde; A dönemlerinden düşük değil |
+| Su kullanımı | B dönemlerinde günlük su A dönemlerinden fazla değil (raporlanır) |
 | Sulama güvenliği | Deney boyunca sıfır kuru çalışma, sıfır taşma; cihaz katmanına ulaşan politika ihlali sıfır |
 | LLM karar doğruluğu | Karar setinde en az %85 doğru aksiyon (yerel model) |
 | Gerekçe doğruluğu | Karar ve notlarda araç çıktısında olmayan sayı yok |
@@ -389,7 +389,7 @@ Takvim tek döneme sığar: teslim Ocak 2027 başı. 12 Kasım – 12 Aralık ar
 | Faz | Hedef tarih | İçerik | Bitti sayılır |
 | --- | --- | --- | --- |
 | 0 — Tezgah testi | 29 Eki – 7 Kas | Parça siparişi (bu hafta); tek nem sensörü + ESP32; kalibrasyon; mevcut `/api/ingest`'e mevcut cihaz tokenıyla POST | Panoda gerçek nem verisi görünüyor; backend değişikliği yok |
-| 1 — İzleme ve veri toplama | 29 Eki – 15 Kas | `Node` + kanal modeli, toplu gönderim, NTP, tampon, rate limit düzeltmesi; `OpenAiCompatibleLlmClient` + Ollama; kart HTTPS ile Azure'a gönderir; 3 saksı arkadaşın evinde kurulur ve **veri toplama başlar** (elle sulama; sulama anları nemdeki sıçramadan çıkarılır); tarayıcıdan firmware kurulum sayfası | 3 saksı 48 saat kesintisiz; "Açıkla" yerel modelle çalışıyor |
+| 1 — İzleme ve veri toplama | 29 Eki – 15 Kas | `Node` + kanal modeli, toplu gönderim, NTP, tampon, rate limit düzeltmesi; `OpenAiCompatibleLlmClient` + Ollama; kart HTTPS ile Azure'a gönderir; saksı arkadaşın evinde kurulur ve **veri toplama başlar** (elle sulama; sulama anları nemdeki sıçramadan çıkarılır); tarayıcıdan firmware kurulum sayfası | Kart 48 saat kesintisiz; "Açıkla" yerel modelle çalışıyor |
 | 2 — Sulama ve politika | 15 – 30 Kas | Pompa, röle, şamandıra; `Zone`, karar/komut/olay modeli; politika katmanı; ayar ve olay uç noktaları; kural motoru; firmware güvenlik katmanı | Kural modunda otomatik ve manuel sulama çalışıyor; tüm engel durumları test edildi |
 | 3 — Tahmin modeli | Kasım (açık veri) – 12 Ara (kendi veri) | Açık veriyle yöntem geliştirme donanım beklemeden başlar; kendi verimizle eğitim; ONNX entegrasyonu; `ForecastJob` | Tahmin panoda; MAE raporlandı |
 | 4 — LLM karar ajanı ve notlar | 1 – 14 Ara | Karar ajanı, öneri notları, değerlendirme setleri, arayüz | Karar ve soru setleri üç yapılandırmada çalıştırıldı |
@@ -427,6 +427,7 @@ Bahar dönemindeki zorunlu staj nedeniyle geliştirme Ocak ortasında kapanır. 
 | Geliştirici düzeneğe uzaktan erişemez | Ayarlar sunucudan; firmware tarayıcıdan yüklenir; sürüm panoda doğrulanır; kart çevrimdışı uyarısı; Faz 2 pompa testleri boş saksıda ve görüntülü görüşmeyle |
 | Azure ücretsiz katmanı gerçek kartın sürekli gönderimine yetmez (CPU kotası, uyku) | Gerçek kart bağlanınca kota izlenir; gerekirse ölçüm aralığı büyütülür veya B1 katmanına geçilir (öğrenci kredisiyle) |
 | Düzenek arkadaşın evinden geliştiricinin evine taşınırken bitkiler etkilenir | Deney taşımadan sonra yeni bir uyum süresiyle başlar; uzak dönem verisi yalnızca model eğitiminde kullanılır |
+| Tek saksıda modlar farklı zamanlarda çalışır; hava ve bitki değişimi sonuca karışır | A/B blokları iç içe; her blokta sıcaklık ve ışık raporlanır; tahmin katkısı karar setinde ölçülür; sınırlılık olarak yazılır |
 | Açık verinin koşulları saksıdan farklı | Aktarım performansı ayrıca raporlanır; ana test her zaman kendi verimizde |
 | Hatalı veya tutarsız nem sensörü | Yedek sensör; kanal bazında kalibrasyon; sabit değer ve ani sıçrama için sensör notu |
 | Su elektronikle temas eder | Elektronik buatta ve saksı seviyesinin üstünde; hortum bağlantıları kelepçeli; ilk testler boş saksıda |
@@ -440,7 +441,7 @@ Bahar dönemindeki zorunlu staj nedeniyle geliştirme Ocak ortasında kapanır. 
 
 - Danışman "veri setiyle eğitin" derken tahmin modelini mi, LLM'in ince ayarını mı kastediyor? Bu PRD ana kapsam olarak tahmin modelini, isteğe bağlı olarak LLM ince ayarını alıyor.
 - LLM'in otomatik uygulayabileceği kararlar yalnızca sulama mı olsun, yoksa bant ayarları da onaysız değişebilsin mi? Bu PRD yalnızca sulamayı otomatik bırakıyor.
-- Kaç saksı ve hangi bitki? Nem bantları bitkiye göre belirlenecek.
+- Hangi bitki? Nem bantları bitkiye göre belirlenecek. (Saksı sayısı: 1, bütçe nedeniyle; §12.)
 - Sunum yerel demo modunda mı yapılacak, yoksa bulut demosu da gösterilecek mi?
 - Proje ekip çalışması mı? Firmware, ML ve backend işleri bölünecekse sorumlular bu dokümana eklenmeli.
 
