@@ -24,8 +24,10 @@ constexpr uint8_t kSamplesPerReading = 10;  // PRD §6: mean of 10 samples per c
 constexpr uint16_t kDefaultSoilDryMv = 2800;
 constexpr uint16_t kDefaultSoilWetMv = 1200;
 
-// Soil 1–3, air temperature, air humidity, light on; spare soil4 off.
-constexpr uint8_t kDefaultChannelMask = 0b1110111;
+// One pot: soil1, air temperature, air humidity and light on; soil2–4 off until probes are added.
+// A reading from a channel the server doesn't know rejects the whole batch, so only enable what's
+// registered in the web app.
+constexpr uint8_t kDefaultChannelMask = 0b1110001;
 
 constexpr uint32_t kUploadIntervalMs = 60000;
 constexpr uint32_t kHttpTimeoutMs = 15000;
