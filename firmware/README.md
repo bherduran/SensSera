@@ -59,7 +59,7 @@ Until then the defaults (2800 / 1200 mV) give only a rough %.
 ## Behaviour worth knowing
 
 - No readings are taken until NTP has set the clock; timestamps are UTC.
-- Readings wait in a RAM ring buffer (100 000 in PSRAM, about 5.8 days at the defaults).
+- Readings wait in a RAM ring buffer (100 000 in PSRAM, about 8.7 days at the 4 default channels).
   When it's full the oldest are overwritten. A power cut empties it.
 - Upload failures back off from 10 s to 5 min; a `400` batch is dropped so it can't
   block the queue. The board never restarts because of Wi-Fi, only the task watchdog

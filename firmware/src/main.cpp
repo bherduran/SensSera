@@ -17,7 +17,7 @@ namespace {
 
 Settings cfg;
 
-// ~5.8 days of readings at 6 channels every 30 s, so a weekend Wi-Fi outage at the
+// ~8.7 days of readings at the 4 default channels every 30 s, so a weekend Wi-Fi outage at the
 // friend's house loses nothing. The buffer is RAM only: a power cut still loses it.
 constexpr size_t kPsramBufferReadings = 100000;
 constexpr size_t kInternalBufferReadings = 2048;
