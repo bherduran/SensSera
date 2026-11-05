@@ -24,9 +24,17 @@ pio run -e esp32s3     # board image
 pio run -e esp32s3 -t upload && pio device monitor
 ```
 
-CI (`.github/workflows/firmware.yml`) runs both and publishes the images as an artifact.
-Flash them at their own offsets, never as one merged file: a merged image overwrites
-NVS at 0x9000, which holds Wi-Fi and the token.
+CI (`.github/workflows/firmware.yml`) runs both. Every firmware change merged to `main`
+also becomes a GitHub release (`fw-<sha>`) with the images and a `manifest.json` of their
+offsets. Flash them at their own offsets, never as one merged file and never with an erase:
+NVS at 0x9000–0xE000 holds Wi-Fi, the token and the calibration.
+
+## Installing from the browser
+
+The web app's `/kurulum` page (Chrome or Edge on a desktop) writes the latest release without
+erasing, then talks to the serial console: Wi-Fi and token form, live log, soil calibration.
+It needs no account and never sends the token anywhere but the board. ESP Web Tools isn't
+used because it erases the whole flash on boards without Improv Serial.
 
 ## First-time setup
 
