@@ -1,6 +1,5 @@
 #include "sensors.h"
 
-#include <Adafruit_AHTX0.h>
 #include <BH1750.h>
 #include <Wire.h>
 
@@ -9,10 +8,59 @@
 namespace sensors {
 
 namespace {
-Adafruit_AHTX0 aht;
+constexpr uint8_t kAhtAddress = 0x38;
+// air_temp and air_humidity are read back to back; one measurement serves both.
+constexpr uint32_t kAirReuseMs = 2000;
+
 bool airReady = false;
+uint32_t airAtMs = 0;
+float airTempC = 0;
+float airHumidity = 0;
 BH1750 lightMeter;
 bool lightReady = false;
+
+bool ahtWrite(const uint8_t* bytes, size_t n) {
+  Wire.beginTransmission(kAhtAddress);
+  Wire.write(bytes, n);
+  return Wire.endTransmission() == 0;
+}
+
+bool ahtRead(uint8_t* buf, size_t n) {
+  if (Wire.requestFrom(kAhtAddress, static_cast<uint8_t>(n)) != n) return false;
+  for (size_t i = 0; i < n; i++) buf[i] = Wire.read();
+  return true;
+}
+
+// Own driver instead of Adafruit AHTX0: that one polls the busy bit with no time limit, so a
+// sensor that hangs or a loose cable would block until the watchdog resets the board, and
+// since begin() runs at boot, the board would reset in a loop and never upload.
+bool beginAht() {
+  uint8_t status;
+  if (!ahtRead(&status, 1)) return false;
+  if (!(status & core::kAhtStatusCalibrated)) {
+    const uint8_t init[] = {0xBE, 0x08, 0x00};
+    if (!ahtWrite(init, sizeof init)) return false;
+    delay(10);
+  }
+  return true;
+}
+
+bool measureAir() {
+  if (airAtMs != 0 && millis() - airAtMs < kAirReuseMs) return true;
+  const uint8_t trigger[] = {0xAC, 0x33, 0x00};
+  if (!ahtWrite(trigger, sizeof trigger)) return false;
+  delay(80);  // conversion time per the datasheet
+  uint8_t frame[core::kAhtFrameLen];
+  for (int attempt = 0; attempt < 5; attempt++) {
+    if (ahtRead(frame, sizeof frame) && core::decodeAht(frame, &airTempC, &airHumidity)) {
+      airAtMs = millis();
+      return true;
+    }
+    delay(10);
+  }
+  return false;
+}
+
 }  // namespace
 
 void begin() {
@@ -22,7 +70,7 @@ void begin() {
     if (ch.source == core::Source::Soil) analogSetPinAttenuation(ch.pin, ADC_11db);
   }
   Wire.begin(kPinI2cSda, kPinI2cScl);
-  airReady = aht.begin(&Wire);
+  airReady = beginAht();
   if (!airReady) log_w("AHT25 not found on I2C");
   lightReady = lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE);
   if (!lightReady) log_w("BH1750 not found on I2C");
@@ -45,12 +93,10 @@ bool read(size_t channel, const Settings& s, float* value) {
 
     case core::Source::AirTemp:
     case core::Source::AirHumidity: {
-      if (!airReady) return false;
-      // Each call is one ~80 ms measurement that returns both values; measuring twice
-      // per cycle is simpler than caching and far below the sensor's self-heating limit.
-      sensors_event_t humidity, temp;
-      if (!aht.getEvent(&humidity, &temp)) return false;
-      *value = ch.source == core::Source::AirTemp ? temp.temperature : humidity.relative_humidity;
+      // Retried here so a sensor plugged in after boot starts reporting without a reset.
+      if (!airReady) airReady = beginAht();
+      if (!airReady || !measureAir()) return false;
+      *value = ch.source == core::Source::AirTemp ? airTempC : airHumidity;
       return true;
     }
 

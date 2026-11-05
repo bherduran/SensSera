@@ -39,6 +39,30 @@ bool soilPercent(float mv, SoilCalibration cal, float* out) {
   return true;
 }
 
+uint8_t ahtCrc8(const uint8_t* data, size_t len) {
+  uint8_t crc = 0xFF;
+  for (size_t i = 0; i < len; i++) {
+    crc ^= data[i];
+    for (int bit = 0; bit < 8; bit++) {
+      crc = static_cast<uint8_t>((crc & 0x80) ? (crc << 1) ^ 0x31 : crc << 1);
+    }
+  }
+  return crc;
+}
+
+bool decodeAht(const uint8_t* frame, float* tempC, float* humidityPct) {
+  if (frame[0] & kAhtStatusBusy) return false;
+  if (ahtCrc8(frame, kAhtFrameLen - 1) != frame[kAhtFrameLen - 1]) return false;
+  uint32_t rawHumidity = (static_cast<uint32_t>(frame[1]) << 12) |
+                         (static_cast<uint32_t>(frame[2]) << 4) | (frame[3] >> 4);
+  uint32_t rawTemp = (static_cast<uint32_t>(frame[3] & 0x0F) << 16) |
+                     (static_cast<uint32_t>(frame[4]) << 8) | frame[5];
+  // Datasheet: RH = raw / 2^20 * 100, T = raw / 2^20 * 200 - 50
+  *humidityPct = static_cast<float>(rawHumidity) * 100.0f / 1048576.0f;
+  *tempC = static_cast<float>(rawTemp) * 200.0f / 1048576.0f - 50.0f;
+  return true;
+}
+
 bool formatIso8601Utc(uint32_t epoch, char* buf, size_t len) {
   time_t t = static_cast<time_t>(epoch);
   struct tm tm;
