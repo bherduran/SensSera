@@ -1,6 +1,5 @@
 #include "sensors.h"
 
-#include <BH1750.h>
 #include <Wire.h>
 
 #include "config.h"
@@ -9,6 +8,7 @@ namespace sensors {
 
 namespace {
 constexpr uint8_t kAhtAddress = 0x38;
+constexpr uint8_t kBh1750Address = 0x23;
 // air_temp and air_humidity are read back to back; one measurement serves both.
 constexpr uint32_t kAirReuseMs = 2000;
 
@@ -16,17 +16,15 @@ bool airReady = false;
 uint32_t airAtMs = 0;
 float airTempC = 0;
 float airHumidity = 0;
-BH1750 lightMeter;
-bool lightReady = false;
 
-bool ahtWrite(const uint8_t* bytes, size_t n) {
-  Wire.beginTransmission(kAhtAddress);
+bool i2cWrite(uint8_t address, const uint8_t* bytes, size_t n) {
+  Wire.beginTransmission(address);
   Wire.write(bytes, n);
   return Wire.endTransmission() == 0;
 }
 
-bool ahtRead(uint8_t* buf, size_t n) {
-  if (Wire.requestFrom(kAhtAddress, static_cast<uint8_t>(n)) != n) return false;
+bool i2cRead(uint8_t address, uint8_t* buf, size_t n) {
+  if (Wire.requestFrom(address, static_cast<uint8_t>(n)) != n) return false;
   for (size_t i = 0; i < n; i++) buf[i] = Wire.read();
   return true;
 }
@@ -36,10 +34,10 @@ bool ahtRead(uint8_t* buf, size_t n) {
 // since begin() runs at boot, the board would reset in a loop and never upload.
 bool beginAht() {
   uint8_t status;
-  if (!ahtRead(&status, 1)) return false;
+  if (!i2cRead(kAhtAddress, &status, 1)) return false;
   if (!(status & core::kAhtStatusCalibrated)) {
     const uint8_t init[] = {0xBE, 0x08, 0x00};
-    if (!ahtWrite(init, sizeof init)) return false;
+    if (!i2cWrite(kAhtAddress, init, sizeof init)) return false;
     delay(10);
   }
   return true;
@@ -48,17 +46,32 @@ bool beginAht() {
 bool measureAir() {
   if (airAtMs != 0 && millis() - airAtMs < kAirReuseMs) return true;
   const uint8_t trigger[] = {0xAC, 0x33, 0x00};
-  if (!ahtWrite(trigger, sizeof trigger)) return false;
+  if (!i2cWrite(kAhtAddress, trigger, sizeof trigger)) return false;
   delay(80);  // conversion time per the datasheet
   uint8_t frame[core::kAhtFrameLen];
   for (int attempt = 0; attempt < 5; attempt++) {
-    if (ahtRead(frame, sizeof frame) && core::decodeAht(frame, &airTempC, &airHumidity)) {
+    if (i2cRead(kAhtAddress, frame, sizeof frame) &&
+        core::decodeAht(frame, &airTempC, &airHumidity)) {
       airAtMs = millis();
       return true;
     }
     delay(10);
   }
   return false;
+}
+
+// One-time mode on every read, not continuous mode set once at boot (what the BH1750 library
+// did): a sensor that loses power for a moment comes back powered down and keeps answering 0,
+// which would read as darkness until the board restarted. Re-sending the mode each time also
+// picks up a sensor that was plugged in late, and a missing one simply fails this read.
+bool measureLight(float* lux) {
+  const uint8_t mode = core::kBh1750OneTimeHighRes;
+  if (!i2cWrite(kBh1750Address, &mode, 1)) return false;
+  delay(180);  // maximum high-resolution conversion time per the datasheet
+  uint8_t frame[2];
+  if (!i2cRead(kBh1750Address, frame, sizeof frame)) return false;
+  *lux = core::bh1750Lux(frame);
+  return true;
 }
 
 }  // namespace
@@ -72,8 +85,8 @@ void begin() {
   Wire.begin(kPinI2cSda, kPinI2cScl);
   airReady = beginAht();
   if (!airReady) log_w("AHT25 not found on I2C");
-  lightReady = lightMeter.begin(BH1750::CONTINUOUS_HIGH_RES_MODE);
-  if (!lightReady) log_w("BH1750 not found on I2C");
+  const uint8_t powerOn = 0x01;
+  if (!i2cWrite(kBh1750Address, &powerOn, 1)) log_w("BH1750 not found on I2C");
 }
 
 float soilMillivolts(int pin) {
@@ -93,20 +106,19 @@ bool read(size_t channel, const Settings& s, float* value) {
 
     case core::Source::AirTemp:
     case core::Source::AirHumidity: {
-      // Retried here so a sensor plugged in after boot starts reporting without a reset.
+      // Re-initialised after any failure, so a sensor that was unplugged or plugged in after
+      // boot starts reporting again without a reset.
       if (!airReady) airReady = beginAht();
-      if (!airReady || !measureAir()) return false;
+      if (!airReady || !measureAir()) {
+        airReady = false;
+        return false;
+      }
       *value = ch.source == core::Source::AirTemp ? airTempC : airHumidity;
       return true;
     }
 
-    case core::Source::Light: {
-      if (!lightReady) return false;
-      float lux = lightMeter.readLightLevel();
-      if (lux < 0) return false;
-      *value = lux;
-      return true;
-    }
+    case core::Source::Light:
+      return measureLight(value);
   }
   return false;
 }

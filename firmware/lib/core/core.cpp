@@ -63,6 +63,11 @@ bool decodeAht(const uint8_t* frame, float* tempC, float* humidityPct) {
   return true;
 }
 
+float bh1750Lux(const uint8_t* frame) {
+  uint16_t raw = static_cast<uint16_t>((frame[0] << 8) | frame[1]);
+  return static_cast<float>(raw) / 1.2f;  // datasheet: default measurement time (MTreg 69)
+}
+
 bool formatIso8601Utc(uint32_t epoch, char* buf, size_t len) {
   time_t t = static_cast<time_t>(epoch);
   struct tm tm;
