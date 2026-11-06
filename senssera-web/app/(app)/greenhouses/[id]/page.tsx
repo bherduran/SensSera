@@ -307,6 +307,8 @@ function DeviceRow({
                   <AlertDialogDescription>
                     This removes the device with its readings and alert history.
                     This cannot be undone.
+                    {device.channel &&
+                      ` If the board still sends “${device.channel}”, those readings will be rejected and shown on the board card until the channel is turned off on the board or added again.`}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>

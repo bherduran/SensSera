@@ -1,10 +1,10 @@
 "use client";
 
 import { toast } from "sonner";
-import { Cpu, KeyRound, Plus, Trash2 } from "lucide-react";
+import { Cpu, KeyRound, Plus, Trash2, TriangleAlert } from "lucide-react";
 import { useDeleteNode, useNodes, useRotateNodeToken } from "@/hooks/use-nodes";
 import { METRIC_META } from "@/lib/metrics";
-import { timeAgo } from "@/lib/time";
+import { timeAgo, withinLastDay } from "@/lib/time";
 import type { Node, NodeStatus } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -224,6 +224,17 @@ function NodeCard({
           </div>
         )}
       </div>
+
+      {/* The API stores the good readings of a batch and skips the rest, so the board never
+          looks offline over it; this is where an unregistered channel or a bad value shows. */}
+      {withinLastDay(node.lastRejectedAt) && (
+        <p role="status" className="flex items-start gap-2 border-t px-4 py-2 text-xs text-destructive">
+          <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span>
+            Readings rejected {timeAgo(node.lastRejectedAt)}: {node.lastRejectReason}
+          </span>
+        </p>
+      )}
 
       {node.channels.length === 0 ? (
         <p className="border-t border-dashed px-4 py-3 text-sm text-muted-foreground">

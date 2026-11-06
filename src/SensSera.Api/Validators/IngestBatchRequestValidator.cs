@@ -15,8 +15,9 @@ public sealed class IngestBatchRequestValidator : AbstractValidator<IngestBatchR
             .Must(r => r.Count <= MaxReadings)
             .WithMessage($"A batch can contain at most {MaxReadings} readings");
 
-        // Every reading gets the same checks as the single-reading endpoint, and the whole batch
-        // is rejected up front — no half-written batch when item N is invalid.
-        RuleForEach(x => x.Readings).SetValidator(new IngestRequestValidator());
+        // Only the shape is checked here. Each reading's content is checked by the service, which
+        // stores the good ones and reports the rest (ReadingRules): a 400 makes the board drop the
+        // whole batch, so it is kept for requests that could never succeed.
+        RuleForEach(x => x.Readings).NotNull();
     }
 }

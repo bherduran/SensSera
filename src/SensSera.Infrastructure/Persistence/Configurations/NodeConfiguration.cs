@@ -12,6 +12,7 @@ public class NodeConfiguration : IEntityTypeConfiguration<Node>
         builder.Property(n => n.Name).IsRequired().HasMaxLength(200);
         builder.Property(n => n.TokenHash).IsRequired();
         builder.Property(n => n.FirmwareVersion).HasMaxLength(50);
+        builder.Property(n => n.LastRejectReason).HasMaxLength(300);
 
         builder.HasOne(n => n.Greenhouse)
             .WithMany(g => g.Nodes)

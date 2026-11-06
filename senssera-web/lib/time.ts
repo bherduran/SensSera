@@ -11,3 +11,8 @@ export function timeAgo(iso: string | null | undefined, now: number = Date.now()
   if (elapsed < DAY) return `${Math.floor(elapsed / HOUR)} h ago`;
   return `${Math.floor(elapsed / DAY)} d ago`;
 }
+
+/** Whether a timestamp falls in the last day, e.g. to keep a warning up until it has gone stale. */
+export function withinLastDay(iso: string | null | undefined, now: number = Date.now()): boolean {
+  return !!iso && now - Date.parse(iso) < DAY;
+}

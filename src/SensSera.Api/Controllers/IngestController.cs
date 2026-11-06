@@ -28,13 +28,14 @@ public sealed partial class IngestController(IIngestionService service) : Contro
     }
 
     [HttpPost("batch")]
-    public async Task<IActionResult> IngestBatch(
+    public async Task<ActionResult<IngestBatchResponse>> IngestBatch(
         [FromBody] IngestBatchRequest request,
         [FromHeader(Name = FirmwareHeader)] string? firmwareVersion,
         CancellationToken cancellationToken)
     {
-        await service.IngestBatchAsync(Source(firmwareVersion), request, cancellationToken);
-        return NoContent();
+        // 200 even when readings were rejected: the board must not retry them (they'd fail again)
+        // nor drop the good ones with them. The rejected ones are listed and shown on the node card.
+        return Ok(await service.IngestBatchAsync(Source(firmwareVersion), request, cancellationToken));
     }
 
     // Claims come from DeviceTokenAuthenticationHandler: org_id always, plus device_id or node_id.

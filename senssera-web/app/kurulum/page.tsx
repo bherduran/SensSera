@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { BoardSetup } from "@/components/setup/board-setup";
 
 // Public on purpose: the friend hosting the rig installs and configures the board here without
-// an account. The page never calls the API; the token only goes from the browser to the board.
+// an account. Nothing on the page calls the API (only the root layout's session check does), and
+// the token only goes from the browser to the board.
 export const metadata: Metadata = {
   title: "Kart kurulumu — SensSera",
   description: "Saksı Pilotu kartına firmware yükle, Wi-Fi ve token ayarla, nem sensörünü kalibre et.",
