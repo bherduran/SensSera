@@ -144,5 +144,7 @@ public sealed class NodeService(AppDbContext db, ITenantContext tenant, TimeProv
             n.Devices
                 .OrderBy(d => d.Channel)
                 .Select(d => new NodeChannelResponse(d.Id, d.Channel!, d.Name, d.Metric, d.LastSeenAt))
-                .ToList());
+                .ToList(),
+            n.LastRejectedAt,
+            n.LastRejectReason);
 }

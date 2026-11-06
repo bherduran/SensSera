@@ -41,8 +41,9 @@ used because it erases the whole flash on boards without Improv Serial.
 Plug in the board's **USB** port (not "COM") and open a serial terminal at 115200 baud.
 
 1. In the web app, open the greenhouse, **Add board**, and copy the token (it's shown once).
-   Add a channel for every enabled sensor below. A reading from a channel that isn't
-   registered makes the server reject the whole batch (`400`).
+   Add a channel for every enabled sensor below. Readings from a channel that isn't
+   registered are skipped by the server (the rest of the batch is stored) and the board card
+   in the web app shows "Readings rejected".
 2. On the board:
    ```
    wifi "Network name" "password"
@@ -69,8 +70,8 @@ Until then the defaults (2800 / 1200 mV) give only a rough %.
 - No readings are taken until NTP has set the clock; timestamps are UTC.
 - Readings wait in a RAM ring buffer (100 000 in PSRAM, about 8.7 days at the 4 default channels).
   When it's full the oldest are overwritten. A power cut empties it.
-- Upload failures back off from 10 s to 5 min; a `400` batch is dropped so it can't
-  block the queue. The board never restarts because of Wi-Fi, only the task watchdog
+- Upload failures back off from 10 s to 5 min. A `400` means the request itself is malformed
+  (it can never succeed), so that batch is dropped rather than blocking the queue. The board never restarts because of Wi-Fi, only the task watchdog
   (60 s) resets it.
 - `insecure on` skips the TLS certificate check. It's for the bench only; `status` shows
   it while it's on.

@@ -14,6 +14,9 @@ public class Node : BaseEntity
     public string TokenHash { get; set; } = string.Empty;
     public string? FirmwareVersion { get; set; }
     public DateTime? LastSeenAt { get; set; }
+    // Last time the API stored part of a batch and skipped the rest, and why (shown on the node card).
+    public DateTime? LastRejectedAt { get; set; }
+    public string? LastRejectReason { get; set; }
     public Greenhouse Greenhouse { get; set; } = null!;
     public ICollection<Device> Devices { get; set; } = [];
 }

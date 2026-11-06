@@ -188,6 +188,13 @@ namespace SensSera.Infrastructure.Migrations
                     b.Property<Guid>("GreenhouseId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("LastRejectReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<DateTime?>("LastRejectedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime?>("LastSeenAt")
                         .HasColumnType("timestamp with time zone");
 

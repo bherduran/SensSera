@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { timeAgo } from "./time";
+import { timeAgo, withinLastDay } from "./time";
 
 const now = Date.parse("2026-10-29T12:00:00Z");
 
@@ -19,5 +19,15 @@ describe("timeAgo", () => {
 
   it("treats a timestamp slightly in the future (clock skew) as just now", () => {
     expect(timeAgo("2026-10-29T12:00:05Z", now)).toBe("just now");
+  });
+});
+
+describe("withinLastDay", () => {
+  it.each([
+    ["2026-10-29T01:00:00Z", true],
+    ["2026-10-28T11:00:00Z", false],
+    [null, false],
+  ])("%s → %s", (iso, expected) => {
+    expect(withinLastDay(iso, now)).toBe(expected);
   });
 });

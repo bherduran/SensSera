@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -29,7 +30,7 @@ public sealed class NodeIngestTests(SensSeraApiFactory factory)
             new { metric = "SoilMoisture", value = 41.5, recordedAt = DateTime.UtcNow, channel = "soil1" },
             new { metric = "Temperature", value = 22.0, recordedAt = DateTime.UtcNow, channel = "air_temp" });
 
-        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
         await using var db = CreateDb();
         var readings = await db.SensorReadings.IgnoreQueryFilters()
             .Where(r => r.OrganizationId == seed.OrgId).ToListAsync();
@@ -39,8 +40,11 @@ public sealed class NodeIngestTests(SensSeraApiFactory factory)
         (await db.Nodes.IgnoreQueryFilters().SingleAsync(n => n.Id == seed.NodeId)).LastSeenAt.Should().NotBeNull();
     }
 
+    // Contract change (2026-11-06): an unknown channel used to fail the whole batch with a 400, and
+    // the board drops a batch on 400. Deleting one channel in the web app silently threw away every
+    // reading the board sent, soil moisture included, until someone fixed it over the serial port.
     [Fact]
-    public async Task NodeToken_UnknownChannel_Returns400_AndWritesNothing()
+    public async Task NodeToken_UnknownChannel_StoresKnownChannels_AndRecordsRejectOnNode()
     {
         var seed = await SeedAsync();
 
@@ -48,44 +52,81 @@ public sealed class NodeIngestTests(SensSeraApiFactory factory)
             new { metric = "SoilMoisture", value = 40.0, recordedAt = DateTime.UtcNow, channel = "soil1" },
             new { metric = "SoilMoisture", value = 40.0, recordedAt = DateTime.UtcNow, channel = "soil9" });
 
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        var problem = await response.Content.ReadFromJsonAsync<System.Text.Json.JsonElement>();
-        problem.GetProperty("detail").GetString().Should().Be("Reading 1: unknown channel 'soil9'.");
-        await AssertNoReadingsAsync(seed.OrgId);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("accepted").GetInt32().Should().Be(1);
+        var rejected = body.GetProperty("rejected").EnumerateArray().Should().ContainSingle().Subject;
+        rejected.GetProperty("index").GetInt32().Should().Be(1);
+        rejected.GetProperty("reason").GetString().Should().StartWith("unknown channel 'soil9'");
+
+        await using var db = CreateDb();
+        (await db.SensorReadings.IgnoreQueryFilters().CountAsync(r => r.DeviceId == seed.SoilDeviceId)).Should().Be(1);
+        var node = await db.Nodes.IgnoreQueryFilters().AsNoTracking().SingleAsync(n => n.Id == seed.NodeId);
+        node.LastRejectedAt.Should().NotBeNull();
+        node.LastRejectReason.Should().StartWith("1 of 2 readings rejected. Reading 1: unknown channel 'soil9'");
+        node.LastSeenAt.Should().NotBeNull();
     }
 
-    [Fact]
-    public async Task NodeToken_MetricNotMatchingChannel_Returns400()
+    [Theory]
+    [MemberData(nameof(UnusableNodeReadings))]
+    public async Task NodeToken_UnusableReading_IsRejected_NotStored(object reading, string reason)
     {
         var seed = await SeedAsync();
 
-        var response = await PostBatchAsync(seed.NodeToken,
-            new { metric = "Temperature", value = 20.0, recordedAt = DateTime.UtcNow, channel = "soil1" });
+        var response = await PostBatchAsync(seed.NodeToken, reading);
 
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("accepted").GetInt32().Should().Be(0);
+        body.GetProperty("rejected")[0].GetProperty("reason").GetString().Should().Contain(reason);
         await AssertNoReadingsAsync(seed.OrgId);
     }
 
-    [Fact]
-    public async Task NodeToken_ReadingWithoutChannel_Returns400()
+    public static TheoryData<object, string> UnusableNodeReadings => new()
     {
-        var seed = await SeedAsync();
-
-        var response = await PostBatchAsync(seed.NodeToken,
-            new { metric = "SoilMoisture", value = 40.0, recordedAt = DateTime.UtcNow });
-
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-    }
+        { new { metric = "Temperature", value = 20.0, recordedAt = DateTime.UtcNow, channel = "soil1" }, "measures SoilMoisture" },
+        { new { metric = "SoilMoisture", value = 40.0, recordedAt = DateTime.UtcNow }, "channel is required" },
+        { new { metric = "SoilMoisture", value = 140.0, recordedAt = DateTime.UtcNow, channel = "soil1" }, "outside" },
+        { new { metric = "Rainfall", value = 1.0, recordedAt = DateTime.UtcNow, channel = "soil1" }, "unknown metric" },
+    };
 
     [Fact]
-    public async Task DeviceToken_ReadingWithChannel_Returns400()
+    public async Task DeviceToken_ReadingWithChannel_IsRejected()
     {
         var seed = await SeedAsync();
 
         var response = await PostBatchAsync(seed.StandaloneToken,
             new { metric = "Light", value = 500.0, recordedAt = DateTime.UtcNow, channel = "soil1" });
 
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("rejected")[0].GetProperty("reason").GetString().Should().Contain("only valid with a node token");
+    }
+
+    // What the board does after a Wi-Fi outage: full batches of old readings back to back. The
+    // factory allows 5 requests per token per minute; the 6th must be refused without writing,
+    // so the board can resend it (it keeps a batch on 429) without duplicating anything.
+    [Fact]
+    public async Task NodeBacklog_FullBatchesAreStored_AndA429WritesNothing()
+    {
+        var seed = await SeedAsync();
+        var start = DateTime.UtcNow.AddHours(-6);
+        object[] Batch(int b) => Enumerable.Range(0, 100)
+            .Select(i => (object)new { metric = "SoilMoisture", value = 40.0, recordedAt = start.AddSeconds((b * 100 + i) * 30), channel = "soil1" })
+            .ToArray();
+
+        for (var b = 0; b < 5; b++)
+        {
+            var ok = await PostBatchAsync(seed.NodeToken, Batch(b));
+            ok.StatusCode.Should().Be(HttpStatusCode.OK);
+            (await ok.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("accepted").GetInt32().Should().Be(100);
+        }
+        var limited = await PostBatchAsync(seed.NodeToken, Batch(5));
+
+        limited.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+        await using var db = CreateDb();
+        (await db.SensorReadings.IgnoreQueryFilters().CountAsync(r => r.OrganizationId == seed.OrgId)).Should().Be(500);
+        (await db.Nodes.IgnoreQueryFilters().AsNoTracking().SingleAsync(n => n.Id == seed.NodeId)).LastRejectedAt.Should().BeNull();
     }
 
     [Fact]
@@ -119,7 +160,7 @@ public sealed class NodeIngestTests(SensSeraApiFactory factory)
 
         var response = await PostBatchAsync(seed.NodeToken, "0.1.0+b8bd68c8", SoilReading());
 
-        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
         (await NodeFirmwareAsync(seed.NodeId)).Should().Be("0.1.0+b8bd68c8");
     }
 
@@ -131,7 +172,7 @@ public sealed class NodeIngestTests(SensSeraApiFactory factory)
 
         var response = await PostBatchAsync(seed.NodeToken, SoilReading());
 
-        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
         (await NodeFirmwareAsync(seed.NodeId)).Should().Be("0.1.0+b8bd68c8");
     }
 
@@ -145,7 +186,7 @@ public sealed class NodeIngestTests(SensSeraApiFactory factory)
 
         var response = await PostBatchAsync(seed.NodeToken, version, SoilReading());
 
-        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
         (await NodeFirmwareAsync(seed.NodeId)).Should().BeNull();
         await using var db = CreateDb();
         (await db.SensorReadings.IgnoreQueryFilters().CountAsync(r => r.OrganizationId == seed.OrgId)).Should().Be(1);

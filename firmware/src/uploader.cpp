@@ -71,12 +71,12 @@ void tick(const Settings& s, core::RingBuffer<core::Reading>& buffer) {
       break;
 
     case core::UploadOutcome::DropBatch:
-      // Usually a channel that isn't registered for this board in the web app.
+      // A malformed request, which no retry can fix. Bad readings inside a well-formed batch
+      // don't get here: the server stores the rest and flags them on the board card.
       buffer.popFront(count);
       st.droppedBatches++;
       nextAttemptMs = now + kUploadIntervalMs;
-      log_e("Server rejected a batch (400); dropped %u readings. Are all enabled channels "
-            "registered for this board?", static_cast<unsigned>(count));
+      log_e("Server rejected a batch (400); dropped %u readings", static_cast<unsigned>(count));
       break;
 
     case core::UploadOutcome::Retry:

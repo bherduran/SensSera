@@ -25,8 +25,8 @@ constexpr uint16_t kDefaultSoilDryMv = 2800;
 constexpr uint16_t kDefaultSoilWetMv = 1200;
 
 // One pot: soil1, air temperature, air humidity and light on; soil2–4 off until probes are added.
-// A reading from a channel the server doesn't know rejects the whole batch, so only enable what's
-// registered in the web app.
+// Readings from a channel the server doesn't know are skipped (and flagged on the board card in the
+// web app), so only enable what's registered there.
 constexpr uint8_t kDefaultChannelMask = 0b1110001;
 
 constexpr uint32_t kUploadIntervalMs = 60000;

@@ -78,14 +78,20 @@ public sealed class ApiFlowTests(SensSeraApiFactory factory)
         };
         request.Headers.Add("X-Device-Token", deviceToken);
 
-        (await factory.CreateClient().SendAsync(request)).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        var response = await factory.CreateClient().SendAsync(request);
 
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("accepted").GetInt32().Should().Be(5);
+        body.GetProperty("rejected").GetArrayLength().Should().Be(0);
         var readings = await client.GetFromJsonAsync<JsonElement>($"/api/devices/{deviceId}/readings");
         readings.GetProperty("readings").GetArrayLength().Should().Be(5);
     }
 
+    // Contract change (2026-11-06): a batch used to be all-or-nothing, and the board drops a batch
+    // on 400, so one bad value cost it up to 100 good readings.
     [Fact]
-    public async Task IngestBatch_WithOneInvalidReading_RejectsWholeBatch()
+    public async Task IngestBatch_WithOneInvalidReading_StoresTheRest_AndReportsIt()
     {
         var (client, _) = await RegisterAsync();
         var greenhouseId = await CreateGreenhouseAsync(client);
@@ -99,16 +105,41 @@ public sealed class ApiFlowTests(SensSeraApiFactory factory)
                 readings = new[]
                 {
                     new { metric = "Humidity", value = 50.0, recordedAt = now },
-                    new { metric = "Humidity", value = 500.0, recordedAt = now }, // out of 0-100 range
+                    new { metric = "Humidity", value = 500.0, recordedAt = now },            // out of 0-100 range
+                    new { metric = "Humidity", value = 40.0, recordedAt = now.AddHours(2) }, // clock ahead
                 },
             }),
         };
         request.Headers.Add("X-Device-Token", deviceToken);
 
-        (await factory.CreateClient().SendAsync(request)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var response = await factory.CreateClient().SendAsync(request);
 
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("accepted").GetInt32().Should().Be(1);
+        var rejected = body.GetProperty("rejected").EnumerateArray().ToList();
+        rejected.Select(r => r.GetProperty("index").GetInt32()).Should().Equal(1, 2);
+        rejected[0].GetProperty("reason").GetString().Should().Contain("outside");
+        rejected[1].GetProperty("reason").GetString().Should().Contain("future");
         var readings = await client.GetFromJsonAsync<JsonElement>($"/api/devices/{deviceId}/readings");
-        readings.GetProperty("readings").GetArrayLength().Should().Be(0);
+        readings.GetProperty("readings").EnumerateArray().Should().ContainSingle()
+            .Which.GetProperty("value").GetDouble().Should().Be(50);
+    }
+
+    [Theory]
+    [InlineData(500, "outside")]
+    [InlineData(50, "future")]
+    public async Task Ingest_SingleInvalidReading_Returns400(double value, string reason)
+    {
+        var (client, _) = await RegisterAsync();
+        var greenhouseId = await CreateGreenhouseAsync(client);
+        var (_, deviceToken) = await CreateDeviceAsync(client, greenhouseId, "Humidity");
+        var recordedAt = reason == "future" ? DateTimeOffset.UtcNow.AddHours(1) : DateTimeOffset.UtcNow;
+
+        var response = await IngestAsync(deviceToken, "Humidity", value, recordedAt.ToString("O"));
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await response.Content.ReadAsStringAsync()).Should().Contain(reason);
     }
 
     [Fact]

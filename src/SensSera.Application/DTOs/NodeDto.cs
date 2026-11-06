@@ -24,7 +24,9 @@ public record NodeResponse(
     DateTime? LastSeenAt,
     NodeStatus Status,
     DateTime CreatedAt,
-    List<NodeChannelResponse> Channels);
+    List<NodeChannelResponse> Channels,
+    DateTime? LastRejectedAt,
+    string? LastRejectReason);
 
 // Returned only on create and rotate: the raw token is never stored, so this is the one chance to copy it.
 public record NodeWithTokenResponse(

@@ -923,7 +923,9 @@ export interface paths {
         post: {
             parameters: {
                 query?: never;
-                header?: never;
+                header?: {
+                    "X-Firmware-Version"?: string;
+                };
                 path?: never;
                 cookie?: never;
             };
@@ -962,7 +964,9 @@ export interface paths {
         post: {
             parameters: {
                 query?: never;
-                header?: never;
+                header?: {
+                    "X-Firmware-Version"?: string;
+                };
                 path?: never;
                 cookie?: never;
             };
@@ -979,7 +983,11 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/plain": components["schemas"]["IngestBatchResponse"];
+                        "application/json": components["schemas"]["IngestBatchResponse"];
+                        "text/json": components["schemas"]["IngestBatchResponse"];
+                    };
                 };
             };
         };
@@ -1549,6 +1557,11 @@ export interface components {
         IngestBatchRequest: {
             readings: components["schemas"]["IngestRequest"][];
         };
+        IngestBatchResponse: {
+            /** Format: int32 */
+            accepted: number | string;
+            rejected: components["schemas"]["RejectedReading"][];
+        };
         IngestRequest: {
             metric: string;
             /** Format: double */
@@ -1624,6 +1637,9 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
             channels: components["schemas"]["NodeChannelResponse"][];
+            /** Format: date-time */
+            lastRejectedAt: null | string;
+            lastRejectReason: null | string;
         };
         NodeStatus: number;
         NodeWithTokenResponse: {
@@ -1658,6 +1674,11 @@ export interface components {
             organizationName: string;
             email: string;
             password: string;
+        };
+        RejectedReading: {
+            /** Format: int32 */
+            index: number | string;
+            reason: string;
         };
         RollupPoint: {
             /** Format: date-time */

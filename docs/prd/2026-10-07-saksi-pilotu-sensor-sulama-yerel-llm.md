@@ -105,7 +105,7 @@ Her nem sensörü için iki ham değer kaydedilir: havada (kuru) ve suda (ıslak
 - **Kimlik:** Kart tokenı ve Wi-Fi bilgileri NVS'te (`Preferences`) saklanır; repoya girmez. İlk kurulum seri port üzerinden basit bir komutla yapılır.
 - **Zaman:** Açılışta NTP ile saat alınır. `recordedAt` her zaman UTC gönderilir.
 - **Ölçüm:** Her kanal için 10 örneğin ortalaması alınır; varsayılan ölçüm aralığı 30 sn, sunucudan değiştirilebilir.
-- **Gönderim:** Okumalar kart başına toplu gönderilir (`/api/ingest/batch`, en fazla 100 okuma).
+- **Gönderim:** Okumalar kart başına toplu gönderilir (`/api/ingest/batch`, en fazla 100 okuma). Sunucu geçerli okumaları kaydeder, kayıtsız kanal, aralık dışı değer ya da ileri tarihli okumaları atlayıp yanıtta listeler ve web'deki kart kartında gösterir; `400` yalnızca bozuk istekler için kalır. Böylece tek bir hatalı okuma, kartın tamponundaki 100 okumayı birden kaybettirmez.
 - **Kesinti dayanıklılığı:** Bağlantı yoksa okumalar halka tamponda (ring buffer) birikir ve bağlantı gelince toplu gönderilir. Tampon dolarsa en eski okuma atılır.
 - **Ayar ve komut:** 30 sn'de bir ayar uç noktası sorgulanır (§7.3). Gelen sulama komutu, kartın kendi güvenlik sınırlarıyla yeniden denetlenir (§8.3); sınırı aşan komut kırpılır veya reddedilir ve sonuç sunucuya bildirilir.
 - **Kontrol modları:** Saksının modu `Rule` ise kart kendi kararını verir. `Llm` veya `Manual` ise yalnızca sunucudan gelen komutları uygular. Sunucuya 15 dk ulaşılamazsa `Llm` modundaki saksılar yerel `Rule` moduna düşer ve bağlantı gelince geri döner.

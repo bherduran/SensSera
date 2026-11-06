@@ -34,13 +34,20 @@ public sealed class NodeEndpointsTests(SensSeraApiFactory factory)
         channel.StatusCode.Should().Be(HttpStatusCode.Created);
         var deviceId = (await channel.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("deviceId").GetGuid();
 
-        (await IngestAsync(nodeToken, "soil1")).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await IngestAsync(nodeToken, "soil1")).StatusCode.Should().Be(HttpStatusCode.OK);
 
         var fetched = await client.GetFromJsonAsync<JsonElement>($"/api/nodes/{nodeId}");
         fetched.GetProperty("lastSeenAt").ValueKind.Should().NotBe(JsonValueKind.Null);
         var listed = fetched.GetProperty("channels").EnumerateArray().Should().ContainSingle().Subject;
         listed.GetProperty("deviceId").GetGuid().Should().Be(deviceId);
         listed.GetProperty("channel").GetString().Should().Be("soil1");
+        fetched.GetProperty("lastRejectedAt").ValueKind.Should().Be(JsonValueKind.Null);
+
+        // A channel the board sends but nobody registered shows up on the node, not just in logs.
+        (await IngestAsync(nodeToken, "soil2")).StatusCode.Should().Be(HttpStatusCode.OK);
+        var afterReject = await client.GetFromJsonAsync<JsonElement>($"/api/nodes/{nodeId}");
+        afterReject.GetProperty("lastRejectedAt").ValueKind.Should().NotBe(JsonValueKind.Null);
+        afterReject.GetProperty("lastRejectReason").GetString().Should().Contain("unknown channel 'soil2'");
 
         var device = await client.GetFromJsonAsync<JsonElement>($"/api/devices/{deviceId}");
         device.GetProperty("nodeId").GetGuid().Should().Be(nodeId);
@@ -54,7 +61,7 @@ public sealed class NodeEndpointsTests(SensSeraApiFactory factory)
         var (nodeId, nodeToken) = await CreateNodeWithChannelAsync(client, await CreateGreenhouseAsync(client));
         (await StatusAsync(client, nodeId)).Should().Be("neverSeen");
 
-        (await IngestAsync(nodeToken, "soil1")).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await IngestAsync(nodeToken, "soil1")).StatusCode.Should().Be(HttpStatusCode.OK);
         (await StatusAsync(client, nodeId)).Should().Be("online");
 
         await using (var db = CreateDb())
@@ -76,7 +83,7 @@ public sealed class NodeEndpointsTests(SensSeraApiFactory factory)
         var newToken = (await rotated.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("token").GetString()!;
 
         (await IngestAsync(oldToken, "soil1")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-        (await IngestAsync(newToken, "soil1")).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await IngestAsync(newToken, "soil1")).StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     [Fact]
@@ -130,7 +137,7 @@ public sealed class NodeEndpointsTests(SensSeraApiFactory factory)
         var greenhouseId = await CreateGreenhouseAsync(client);
         var (nodeId, nodeToken) = await CreateNodeWithChannelAsync(client, greenhouseId);
         var deviceId = await ChannelDeviceIdAsync(client, nodeId);
-        (await IngestAsync(nodeToken, "soil1")).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await IngestAsync(nodeToken, "soil1")).StatusCode.Should().Be(HttpStatusCode.OK);
         await SeedAlertAsync(client, greenhouseId, deviceId);
 
         (await client.DeleteAsync($"/api/nodes/{nodeId}")).StatusCode.Should().Be(HttpStatusCode.NoContent);
