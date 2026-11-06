@@ -172,6 +172,13 @@ static void decodeAht_RejectsBusyAndCorruptFrames() {
   TEST_ASSERT_FALSE(decodeAht(f, &t, &h));
 }
 
+static void bh1750Lux_ConvertsBigEndianRaw() {
+  const uint8_t frame[] = {0x01, 0x2C};  // 300 counts
+  TEST_ASSERT_FLOAT_WITHIN(0.001f, 250.0f, bh1750Lux(frame));
+  const uint8_t max[] = {0xFF, 0xFF};
+  TEST_ASSERT_FLOAT_WITHIN(0.1f, 54612.5f, bh1750Lux(max));
+}
+
 int main() {
   UNITY_BEGIN();
   RUN_TEST(ringBuffer_WhenFull_DropsOldest);
@@ -190,5 +197,6 @@ int main() {
   RUN_TEST(ahtCrc8_MatchesReferenceVector);
   RUN_TEST(decodeAht_ConvertsRawValues);
   RUN_TEST(decodeAht_RejectsBusyAndCorruptFrames);
+  RUN_TEST(bh1750Lux_ConvertsBigEndianRaw);
   return UNITY_END();
 }

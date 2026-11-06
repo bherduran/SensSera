@@ -61,6 +61,10 @@ uint8_t ahtCrc8(const uint8_t* data, size_t len);
 // the CRC doesn't match (a glitch on a long I2C cable), so the caller can retry.
 bool decodeAht(const uint8_t* frame, float* tempC, float* humidityPct);
 
+// BH1750 one-time high-resolution measurement: two bytes, big-endian, lux = raw / 1.2.
+constexpr uint8_t kBh1750OneTimeHighRes = 0x20;
+float bh1750Lux(const uint8_t* frame);
+
 // "2026-10-30T11:05:00Z" into buf (needs at least 21 bytes). Returns false if it doesn't fit.
 bool formatIso8601Utc(uint32_t epoch, char* buf, size_t len);
 
