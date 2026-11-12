@@ -53,9 +53,10 @@ Plug in the board's **USB** port (not "COM") and open a serial terminal at 11520
    `status` should show Wi-Fi connected, the clock synced and, within a minute,
    `last HTTP 200`.
 
-Default channels: `soil1` (GPIO4), `air_temp` `air_humidity` (AHT25) and `light` (BH1750);
-the AHT25 and BH1750 share the I²C bus at GPIO8/9. More probes go on `soil2` `soil3` `soil4`
-(GPIO5/6/7), off by default: register the channel in the web app first, then `channel soil2 on`.
+Default channels: `soil1` (GPIO4), `air_temp` `air_humidity` (AHT25) and `light` (BH1750).
+The two I²C sensors have a bus each: BH1750 on GPIO8/9 (SDA/SCL), AHT25 on GPIO15/16. More
+probes go on `soil2` `soil3` `soil4` (GPIO5/6/7), off by default: register the channel in the
+web app first, then `channel soil2 on`.
 
 ## Calibrating a soil probe
 

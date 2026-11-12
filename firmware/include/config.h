@@ -8,8 +8,17 @@
 #endif
 
 // PRD §5.3 pin plan (ESP32-S3 DevKitC N16R8). Soil ADC pins live in core::kChannels.
-constexpr uint8_t kPinI2cSda = 8;
-constexpr uint8_t kPinI2cScl = 9;  // shared by the AHT25 (0x38) and BH1750 (0x23)
+// Each I2C sensor has its own bus: every sensor lead plugs straight into its pin, and a fault
+// on one cable can't take the other sensor down.
+constexpr uint8_t kPinLightSda = 8;  // BH1750 (0x23)
+constexpr uint8_t kPinLightScl = 9;
+constexpr uint8_t kPinAirSda = 15;  // AHT25 (0x38)
+constexpr uint8_t kPinAirScl = 16;
+
+constexpr uint32_t kLightI2cHz = 100000;
+// The bare AHT25 has no pull-up resistors (the BH1750 module does). With only the ESP32's weak
+// internal ones (~45 kΩ) a 40 cm lead takes a few µs to rise: marginal at 100 kHz, fine here.
+constexpr uint32_t kAirI2cHz = 20000;
 
 constexpr const char* kDefaultApiUrl = "https://senssera-api-wcav7.azurewebsites.net";
 
