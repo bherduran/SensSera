@@ -66,7 +66,7 @@ SensSera bugün simülatörden gelen veriyle çalışıyor ve LLM yalnızca alar
 | --- | --- | --- |
 | ESP32-S3 DevKitC N16R8 (pin başlıkları lehimli) | 1 | Wi-Fi dahili, Arduino çatısıyla programlanır |
 | Kapasitif toprak nem sensörü v1.2 | 1 (+2 yedek) | Rezistif (FC-28 gibi) değil: rezistif problar toprakta korozyona uğrar. Ucuz v1.2 kartların bir kısmı hatalı çıkabiliyor, yedek alıp kalibrasyonda test et |
-| AHT25 sıcaklık/nem (I²C) | 1 | Hava sıcaklığı ve nemi (±0,3 °C, ±2 %RH). DHT22 ve SHT31 stokta olmadığı için seçildi; BH1750 ile aynı I²C hattını paylaşır |
+| AHT25 sıcaklık/nem (I²C) | 1 | Hava sıcaklığı ve nemi (±0,3 °C, ±2 %RH). DHT22 ve SHT31 stokta olmadığı için seçildi. Çıplak sensör: bacaklarına kablo lehimlenir, üzerinde pull-up direnci yoktur |
 | BH1750 ışık sensörü | 1 | I²C, lux cinsinden; mevcut `Light` metriğinin 0–100.000 aralığına uyar |
 | 3–6 V mini dalgıç pompa | 1 | Saksı başına bir pompa; ikinci saksı eklenirse röle 2'ye bağlanır |
 | Silikon hortum | 2–3 m | Pompanın çıkış çapına uygun |
@@ -87,7 +87,8 @@ Bütçe nedeniyle tek saksı kullanılır; karşılaştırma saksılar arasında
 | Bağlantı | ESP32-S3 pini | Gerekçe |
 | --- | --- | --- |
 | Nem sensörü 1 / 2 / 3 (yedek: 4) | GPIO4 / GPIO5 / GPIO6 (GPIO7) | ADC1 pinleri (S3'te GPIO1–10); ADC2 Wi-Fi açıkken kullanılamaz |
-| AHT25 + BH1750 SDA / SCL | GPIO8 / GPIO9 | S3 DevKitC'nin Arduino'daki varsayılan I²C pinleri; adresler farklı (0x38, 0x23). Kablo 50 cm'yi geçmemeli |
+| BH1750 SDA / SCL | GPIO8 / GPIO9 | S3 DevKitC'nin Arduino'daki varsayılan I²C pinleri; 100 kHz, modülün kendi pull-up dirençleriyle |
+| AHT25 SDA / SCL | GPIO15 / GPIO16 | Ayrı I²C hattı: her sensör kablosu doğrudan kendi pinine girer (ortak satır ve ek jumper gerekmez), bir kablodaki arıza öbür sensörü düşürmez. Çıplak AHT25'te pull-up yok; hat ESP32'nin dahili dirençleriyle 20 kHz'te sürülür. Kalıcı düzenekte SDA ve SCL'ye 3,3 V'a birer 4,7–10 kΩ direnç eklenmesi önerilir |
 | Şamandıra şalter | GPIO17 | `INPUT_PULLUP`; LOW = depo boş (kalibrasyonda doğrulanır) |
 | Röle 1 / 2 / 3 (pompalar) | GPIO11 / GPIO12 / GPIO13 | Strapping pinlerinden (GPIO0, 3, 45, 46) kaçınılır; açılışta pompa tetiklenmez |
 
