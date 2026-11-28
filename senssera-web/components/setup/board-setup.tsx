@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Loader2 } from "lucide-react";
 import {
   BoardConsole,
+  confirmFirmware,
   downloadFirmware,
   flashFirmware,
   pickPort,
@@ -36,12 +37,13 @@ export function BoardSetup() {
   const supported = useSyncExternalStore(noSubscription, serialSupported, () => null);
   const [install, setInstall] = useState<Install>({ state: "idle" });
   const [connected, setConnected] = useState(false);
+  const [connecting, setConnecting] = useState(false);
   const [lines, setLines] = useState<string[]>([]);
   const [rawMv, setRawMv] = useState<Record<string, number>>({});
   const consoleRef = useRef<BoardConsole | null>(null);
   const logRef = useRef<HTMLPreElement>(null);
 
-  useEffect(() => () => void consoleRef.current?.close(), []);
+  useEffect(() => () => void consoleRef.current?.close().catch(() => {}), []);
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
   }, [lines]);
@@ -58,10 +60,16 @@ export function BoardSetup() {
     const c = consoleRef.current;
     consoleRef.current = null;
     setConnected(false);
-    await c?.close();
+    try {
+      await c?.close();
+    } catch (e) {
+      // The port is still held by this tab; say so instead of looking disconnected.
+      addLine(`Port kapatılamadı: ${messageOf(e)}. Sayfayı yenileyin.`);
+    }
   }
 
   async function connect() {
+    setConnecting(true);
     try {
       const port = await pickPort();
       await disconnect();
@@ -72,11 +80,19 @@ export function BoardSetup() {
       });
       await c.open();
       consoleRef.current = c;
+      try {
+        // Prints the status lines, and restarts a board that sits in its bootloader.
+        await c.ensureFirmware();
+      } catch (e) {
+        await disconnect();
+        throw e;
+      }
       setConnected(true);
       addLine("— karta bağlandı —");
-      await c.send("status");
     } catch (e) {
       if (!cancelledPicker(e)) addLine(`Bağlanılamadı: ${messageOf(e)}`);
+    } finally {
+      setConnecting(false);
     }
   }
 
@@ -106,6 +122,8 @@ export function BoardSetup() {
         (percent) => setInstall({ state: "working", step: "Yazılıyor", percent }),
         () => {},
       );
+      setInstall({ state: "working", step: "Kart yeniden başlatılıyor…" });
+      await confirmFirmware(port, image.manifest.version);
       setInstall({ state: "done", version: image.manifest.version });
     } catch (e) {
       if (cancelledPicker(e)) return setInstall({ state: "idle" });
@@ -180,7 +198,10 @@ export function BoardSetup() {
               <Button variant="outline" onClick={disconnect}>Bağlantıyı kes</Button>
             </>
           ) : (
-            <Button onClick={connect} disabled={busy}>Karta bağlan</Button>
+            <Button onClick={connect} disabled={busy || connecting}>
+              {connecting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Karta bağlan
+            </Button>
           )}
         </div>
         <pre

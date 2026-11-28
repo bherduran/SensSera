@@ -92,28 +92,91 @@ export async function flashFirmware(
   }
 }
 
+/**
+ * Opens the console just long enough to see the freshly written firmware answer. Without this a
+ * board that stayed in the bootloader looked like a successful install.
+ */
+export async function confirmFirmware(port: SerialPort, expectedVersion: string): Promise<void> {
+  const board = new BoardConsole(port, () => {}, () => {});
+  await board.open();
+  let running: string;
+  try {
+    running = await board.ensureFirmware({ booting: true });
+  } finally {
+    await board.close();
+  }
+  if (running !== expectedVersion) {
+    throw new Error(`Kart ${running} sürümüyle açıldı, ${expectedVersion} bekleniyordu. Yüklemeyi tekrar deneyin.`);
+  }
+}
+
+// --- Control lines ----------------------------------------------------------------------------
+
+// On the ESP32-S3's native USB the two modem-control lines are the reset circuit: RTS holds the
+// chip in reset, and DTR asserted while RTS is released boots it into the ROM bootloader. Chrome
+// asserts both when it opens a port and drops both when it closes it. Measured on the pilot board,
+// that closing edge reset it on every disconnect (emptying its RAM reading buffer), and the board
+// has ended up in the bootloader, where it ignores the console.
+
+/** Lowers RTS, then DTR. In this order neither edge resets the board; the other order can. */
+async function releaseControlLines(port: SerialPort): Promise<void> {
+  await port.setSignals({ requestToSend: false });
+  await port.setSignals({ dataTerminalReady: false });
+}
+
+/**
+ * Restarts the chip into the firmware, also from the bootloader. The DTR pulse comes first: an RTS
+ * pulse alone was seen to land in the bootloader again. Windows' usbser.sys only sends a change on
+ * one line along with a call for the other, hence the pairs.
+ */
+async function restartIntoFirmware(port: SerialPort): Promise<void> {
+  await port.setSignals({ dataTerminalReady: true });
+  await port.setSignals({ requestToSend: false });
+  await sleep(60);
+  await port.setSignals({ dataTerminalReady: false });
+  await port.setSignals({ requestToSend: false });
+  await sleep(60);
+  await port.setSignals({ requestToSend: true });
+  await port.setSignals({ dataTerminalReady: false });
+  await sleep(120);
+  await port.setSignals({ requestToSend: false });
+  await port.setSignals({ dataTerminalReady: false });
+}
+
 // --- Console ----------------------------------------------------------------------------------
+
+const BOOT_BANNER = "Saksi Pilotu firmware"; // setup() in firmware/src/main.cpp
+const STATUS_FIRMWARE = /^firmware\s+(\S+)/; // first line of `status`
+
+/** How long the firmware gets to answer `status`, and to print its banner after a reset. */
+export type ConsoleTiming = { answerMs: number; bootMs: number };
+const DEFAULT_TIMING: ConsoleTiming = { answerMs: 2500, bootMs: 6000 };
 
 /** Line-based connection to the firmware's serial console (firmware/src/console.cpp). */
 export class BoardConsole {
-  private abort?: AbortController;
+  private reader?: ReadableStreamDefaultReader<Uint8Array>;
   private reading?: Promise<void>;
+  private closing = false;
+  private readonly watchers = new Set<(line: string) => void>();
 
   constructor(
     private readonly port: SerialPort,
     private readonly onLine: (line: string) => void,
     private readonly onClosed: () => void,
+    private readonly timing: ConsoleTiming = DEFAULT_TIMING,
   ) {}
 
   async open(): Promise<void> {
     await this.port.open({ baudRate: 115200 });
-    const abort = new AbortController();
-    this.abort = abort;
+    await releaseControlLines(this.port);
+    const reader = this.port.readable!.getReader();
+    this.reader = reader;
     // Unplugging the board ends the stream with an error; either way the console is gone.
-    this.reading = this.readLines(abort.signal)
+    this.reading = this.readLines(reader)
       .catch(() => {})
       .finally(() => {
-        if (!abort.signal.aborted) this.onClosed();
+        reader.releaseLock();
+        if (!this.closing) this.onClosed();
       });
   }
 
@@ -127,27 +190,67 @@ export class BoardConsole {
     }
   }
 
-  async close(): Promise<void> {
-    this.abort?.abort();
-    await this.reading;
-    await this.port.close().catch(() => {});
+  /**
+   * Resolves with the version of the firmware answering on the console. A board that doesn't
+   * answer is restarted once. `booting` is for a board that was just reset: wait for its banner.
+   */
+  async ensureFirmware({ booting = false } = {}): Promise<string> {
+    if (booting) await this.nextLine((line) => line.startsWith(BOOT_BANNER), this.timing.bootMs);
+    const version = (await this.askVersion()) ?? (await this.restartAndAsk());
+    if (!version) throw new Error("Kart cevap vermiyor. USB kablosunu çıkarıp takın, sonra tekrar deneyin.");
+    return version;
   }
 
-  private async readLines(signal: AbortSignal): Promise<void> {
-    if (!this.port.readable) return;
+  async close(): Promise<void> {
+    this.closing = true;
+    // port.close() rejects while the reader still holds its lock, so the read loop has to end first.
+    await this.reader?.cancel().catch(() => {});
+    await this.reading;
+    await this.port.close();
+  }
+
+  private async askVersion(): Promise<string | null> {
+    const answer = this.nextLine((line) => STATUS_FIRMWARE.test(line), this.timing.answerMs);
+    await this.send("status");
+    return (await answer)?.match(STATUS_FIRMWARE)?.[1] ?? null;
+  }
+
+  private async restartAndAsk(): Promise<string | null> {
+    const booted = this.nextLine((line) => line.startsWith(BOOT_BANNER), this.timing.bootMs);
+    await restartIntoFirmware(this.port);
+    return (await booted) ? this.askVersion() : null;
+  }
+
+  /** The next line matching `wanted`, or null once `timeoutMs` has passed. */
+  private nextLine(wanted: (line: string) => boolean, timeoutMs: number): Promise<string | null> {
+    return new Promise((resolve) => {
+      const watcher = (line: string) => {
+        if (wanted(line)) done(line);
+      };
+      const done = (line: string | null) => {
+        clearTimeout(timer);
+        this.watchers.delete(watcher);
+        resolve(line);
+      };
+      const timer = setTimeout(() => done(null), timeoutMs);
+      this.watchers.add(watcher);
+    });
+  }
+
+  private async readLines(reader: ReadableStreamDefaultReader<Uint8Array>): Promise<void> {
+    const decoder = new TextDecoder();
     let pending = "";
-    // The signal goes on the first pipe so aborting unlocks port.readable and close() can run.
-    // TS types the decoder's input as BufferSource, the port's output as Uint8Array; they fit.
-    const decoder = new TextDecoderStream() as unknown as TransformStream<Uint8Array, string>;
-    await this.port.readable.pipeThrough(decoder, { signal }).pipeTo(
-      new WritableStream({
-        write: (chunk) => {
-          pending += chunk;
-          const lines = pending.split("\n");
-          pending = lines.pop() ?? "";
-          for (const line of lines) this.onLine(line.replace(/\r$/, ""));
-        },
-      }),
-    );
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) return;
+      pending += decoder.decode(value, { stream: true });
+      const lines = pending.split("\n");
+      pending = lines.pop() ?? "";
+      for (const raw of lines) {
+        const line = raw.replace(/\r$/, "");
+        this.onLine(line);
+        for (const watcher of [...this.watchers]) watcher(line);
+      }
+    }
   }
 }
